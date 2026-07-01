@@ -39,3 +39,14 @@ db.sqlite
 /searxng
 
 certificates
+
+# Local tooling
+.switchboard/
+package-lock.json
+tsconfig.tsbuildinfo
+
+# Saved Docker image exports (large; images live in GHCR now)
+*.tar
+
+# Claude Code local config / runtime files
+.claude/

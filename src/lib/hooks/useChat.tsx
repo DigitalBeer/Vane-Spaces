@@ -11,7 +11,7 @@ import {
   useState,
 } from 'react';
 import crypto from 'crypto';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { getSuggestions } from '../actions';
 import { MinimalProvider } from '../models/types';
@@ -28,6 +28,12 @@ export type Section = {
   suggestions?: string[];
 };
 
+export type SpaceSummary = {
+  id: string;
+  name: string;
+  icon: { type: 'emoji' | 'color'; value: string } | null;
+};
+
 type ChatContext = {
   messages: Message[];
   sections: Section[];
@@ -36,6 +42,8 @@ type ChatContext = {
   fileIds: string[];
   sources: string[];
   chatId: string | undefined;
+  spaceId: string | null;
+  spaceInfo: SpaceSummary | null;
   optimizationMode: string;
   isMessagesLoaded: boolean;
   loading: boolean;
@@ -51,12 +59,16 @@ type ChatContext = {
   setSources: (sources: string[]) => void;
   setFiles: (files: File[]) => void;
   setFileIds: (fileIds: string[]) => void;
+  setSpaceId: (spaceId: string | null) => void;
+  setSpaceInfo: (info: SpaceSummary | null) => void;
   sendMessage: (
     message: string,
     messageId?: string,
     rewrite?: boolean,
+    displayQuery?: string,
   ) => Promise<void>;
-  rewrite: (messageId: string) => void;
+  rewrite: (messageId: string, newQuery?: string) => void;
+  stopGeneration: () => void;
   setChatModelProvider: (provider: ChatModelProvider) => void;
   setEmbeddingModelProvider: (provider: EmbeddingModelProvider) => void;
 };
@@ -180,6 +192,8 @@ const loadMessages = async (
   setNotFound: (notFound: boolean) => void,
   setFiles: (files: File[]) => void,
   setFileIds: (fileIds: string[]) => void,
+  setSpaceId: (spaceId: string | null) => void,
+  setSpaceInfo: (info: SpaceSummary | null) => void,
 ) => {
   const res = await fetch(`/api/chats/${chatId}`, {
     method: 'GET',
@@ -235,12 +249,22 @@ const loadMessages = async (
 
   chatHistory.current = history;
   setSources(data.chat.sources);
+  if (data.chat.spaceId) {
+    setSpaceId(data.chat.spaceId);
+  }
+  if (data.space) {
+    setSpaceInfo(data.space);
+  } else {
+    setSpaceInfo(null);
+  }
   setIsMessagesLoaded(true);
 };
 
 export const chatContext = createContext<ChatContext>({
   chatHistory: [],
   chatId: '',
+  spaceId: null,
+  spaceInfo: null,
   fileIds: [],
   files: [],
   sources: [],
@@ -257,10 +281,13 @@ export const chatContext = createContext<ChatContext>({
   embeddingModelProvider: { key: '', providerId: '' },
   researchEnded: false,
   rewrite: () => {},
+  stopGeneration: () => {},
   sendMessage: async () => {},
   setFileIds: () => {},
   setFiles: () => {},
   setSources: () => {},
+  setSpaceId: () => {},
+  setSpaceInfo: () => {},
   setOptimizationMode: () => {},
   setChatModelProvider: () => {},
   setEmbeddingModelProvider: () => {},
@@ -269,11 +296,17 @@ export const chatContext = createContext<ChatContext>({
 
 export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const params: { chatId: string } = useParams();
+  const router = useRouter();
 
   const searchParams = useSearchParams();
   const initialMessage = searchParams.get('q');
+  const initialDisplayTitle = searchParams.get('title');
+  const spaceIdFromQuery = searchParams.get('space');
 
   const [chatId, setChatId] = useState<string | undefined>(params.chatId);
+  const [spaceId, setSpaceId] = useState<string | null>(spaceIdFromQuery);
+  const [spaceInfo, setSpaceInfo] = useState<SpaceSummary | null>(null);
+  const spaceIdRef = useRef<string | null>(spaceIdFromQuery);
   const [newChatCreated, setNewChatCreated] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -312,6 +345,14 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [isReady, setIsReady] = useState(false);
 
   const messagesRef = useRef<Message[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const stopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
 
   const sections = useMemo<Section[]>(() => {
     return messages.map((msg) => {
@@ -331,7 +372,9 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
       msg.responseBlocks.forEach((block) => {
         if (block.type === 'text') {
-          let processedText = block.data;
+          let processedText = block.data
+            .replace(/<\/?(?:invoke|parameter|function_calls|antml:invoke|antml:parameter|antml:function_calls)[^>]*>/gi, '')
+            .replace(/^\s*\n/gm, '\n');
           const citationRegex = /\[([^\]]+)\]/g;
           const regex = /\[(\d+)\]/g;
 
@@ -471,8 +514,48 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
+    spaceIdRef.current = spaceId;
+  }, [spaceId]);
+
+  useEffect(() => {
+    if (spaceIdFromQuery) {
+      setSpaceId(spaceIdFromQuery);
+    }
+  }, [spaceIdFromQuery]);
+
+  useEffect(() => {
+    if (!spaceId) {
+      setSpaceInfo(null);
+      return;
+    }
+    if (spaceInfo?.id === spaceId) return;
+    fetch(`/api/spaces/${spaceId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.space) {
+          setSpaceInfo({
+            id: data.space.id,
+            name: data.space.name,
+            icon: data.space.icon ?? null,
+          });
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaceId]);
+
+  useEffect(() => {
     if (params.chatId && params.chatId !== chatId) {
       setChatId(params.chatId);
+      setMessages([]);
+      chatHistory.current = [];
+      setFiles([]);
+      setFileIds([]);
+      setIsMessagesLoaded(false);
+      setNotFound(false);
+      setNewChatCreated(false);
+    } else if (!params.chatId && messages.length > 0) {
+      setChatId(undefined);
       setMessages([]);
       chatHistory.current = [];
       setFiles([]);
@@ -499,6 +582,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         setNotFound,
         setFiles,
         setFileIds,
+        setSpaceId,
+        setSpaceInfo,
       );
     } else if (!chatId) {
       setNewChatCreated(true);
@@ -523,7 +608,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [isMessagesLoaded, isConfigReady, newChatCreated]);
 
-  const rewrite = (messageId: string) => {
+  const rewrite = (messageId: string, newQuery?: string) => {
     const index = messages.findIndex((msg) => msg.messageId === messageId);
 
     if (index === -1) return;
@@ -533,7 +618,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     chatHistory.current = chatHistory.current.slice(0, index * 2);
 
     const messageToRewrite = messages[index];
-    sendMessage(messageToRewrite.query, messageToRewrite.messageId, true);
+    sendMessage(
+      newQuery || messageToRewrite.query,
+      messageToRewrite.messageId,
+      true,
+    );
   };
 
   useEffect(() => {
@@ -542,7 +631,12 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         toast.error('Cannot send message before the configuration is ready');
         return;
       }
-      sendMessage(initialMessage);
+      sendMessage(
+        initialMessage,
+        undefined,
+        false,
+        initialDisplayTitle ?? undefined,
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfigReady, isReady, initialMessage]);
@@ -583,6 +677,10 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                 (b) => b.id === data.block.id,
               );
 
+              const responseStartedAt =
+                msg.responseStartedAt ??
+                (data.block.type === 'text' ? Date.now() : undefined);
+
               if (exists !== -1) {
                 const existingBlocks = [...msg.responseBlocks];
                 existingBlocks[exists] = data.block;
@@ -590,12 +688,14 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                 return {
                   ...msg,
                   responseBlocks: existingBlocks,
+                  responseStartedAt,
                 };
               }
 
               return {
                 ...msg,
                 responseBlocks: [...msg.responseBlocks, data.block],
+                responseStartedAt,
               };
             }
             return msg;
@@ -636,6 +736,18 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
         handledMessageEndRef.current.add(messageId);
 
+        const completedAt = Date.now();
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.messageId === messageId
+              ? { ...msg, completedAt, status: 'completed' as const }
+              : msg,
+          ),
+        );
+
+        setLoading(false);
+
         const currentMsg = messagesRef.current.find(
           (msg) => msg.messageId === messageId,
         );
@@ -651,16 +763,6 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         ];
 
         chatHistory.current = newHistory;
-
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.messageId === messageId
-              ? { ...msg, status: 'completed' as const }
-              : msg,
-          ),
-        );
-
-        setLoading(false);
 
         const lastMsg = messagesRef.current[messagesRef.current.length - 1];
 
@@ -715,6 +817,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     message,
     messageId,
     rewrite = false,
+    displayQuery,
   ) => {
     if (loading || !message) return;
     setLoading(true);
@@ -722,7 +825,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     setMessageAppeared(false);
 
     if (messages.length <= 1) {
-      window.history.replaceState(null, '', `/c/${chatId}`);
+      router.replace(`/c/${chatId}`, { scroll: false });
     }
 
     messageId = messageId ?? crypto.randomBytes(7).toString('hex');
@@ -733,6 +836,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       chatId: chatId!,
       backendId,
       query: message,
+      displayQuery,
       responseBlocks: [],
       status: 'answering',
       createdAt: new Date(),
@@ -742,66 +846,93 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
     const messageIndex = messages.findIndex((m) => m.messageId === messageId);
 
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        content: message,
-        message: {
-          messageId: messageId,
-          chatId: chatId!,
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           content: message,
-        },
-        chatId: chatId!,
-        files: fileIds,
-        sources: sources,
-        optimizationMode: optimizationMode,
-        history: rewrite
-          ? chatHistory.current.slice(
-              0,
-              messageIndex === -1 ? undefined : messageIndex,
-            )
-          : chatHistory.current,
-        chatModel: {
-          key: chatModelProvider.key,
-          providerId: chatModelProvider.providerId,
-        },
-        embeddingModel: {
-          key: embeddingModelProvider.key,
-          providerId: embeddingModelProvider.providerId,
-        },
-        systemInstructions: localStorage.getItem('systemInstructions'),
-      }),
-    });
+          message: {
+            messageId: messageId,
+            chatId: chatId!,
+            content: message,
+          },
+          chatId: chatId!,
+          files: fileIds,
+          sources: sources,
+          optimizationMode: optimizationMode,
+          history: rewrite
+            ? chatHistory.current.slice(
+                0,
+                messageIndex === -1 ? undefined : messageIndex,
+              )
+            : chatHistory.current,
+          chatModel: {
+            key: chatModelProvider.key,
+            providerId: chatModelProvider.providerId,
+          },
+          embeddingModel: {
+            key: embeddingModelProvider.key,
+            providerId: embeddingModelProvider.providerId,
+          },
+          systemInstructions: localStorage.getItem('systemInstructions'),
+          spaceId: spaceIdRef.current,
+        }),
+        signal: abortController.signal,
+      });
 
-    if (!res.body) throw new Error('No response body');
+      if (!res.body) throw new Error('No response body');
 
-    const reader = res.body?.getReader();
-    const decoder = new TextDecoder('utf-8');
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder('utf-8');
 
-    let partialChunk = '';
+      let partialChunk = '';
 
-    const messageHandler = getMessageHandler(newMessage);
+      const messageHandler = getMessageHandler(newMessage);
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
 
-      partialChunk += decoder.decode(value, { stream: true });
+        partialChunk += decoder.decode(value, { stream: true });
 
-      try {
-        const messages = partialChunk.split('\n');
-        for (const msg of messages) {
-          if (!msg.trim()) continue;
-          const json = JSON.parse(msg);
-          messageHandler(json);
+        try {
+          const messages = partialChunk.split('\n');
+          for (const msg of messages) {
+            if (!msg.trim()) continue;
+            const json = JSON.parse(msg);
+            messageHandler(json);
+          }
+          partialChunk = '';
+        } catch (error) {
+          console.warn('Incomplete JSON, waiting for next chunk...');
         }
-        partialChunk = '';
-      } catch (error) {
-        console.warn('Incomplete JSON, waiting for next chunk...');
       }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        // User stopped generation — finalise the partial response
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.messageId === messageId && msg.status === 'answering'
+              ? {
+                  ...msg,
+                  status: 'completed' as const,
+                  completedAt: Date.now(),
+                }
+              : msg,
+          ),
+        );
+        setLoading(false);
+      } else {
+        throw error;
+      }
+    } finally {
+      abortControllerRef.current = null;
     }
   };
 
@@ -815,6 +946,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         fileIds,
         sources,
         chatId,
+        spaceId,
+        spaceInfo,
         hasError,
         isMessagesLoaded,
         isReady,
@@ -825,8 +958,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         setFileIds,
         setFiles,
         setSources,
+        setSpaceId,
+        setSpaceInfo,
         setOptimizationMode,
         rewrite,
+        stopGeneration,
         sendMessage,
         setChatModelProvider,
         chatModelProvider,

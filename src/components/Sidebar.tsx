@@ -62,13 +62,25 @@ const Sidebar = ({ children }: { children: React.ReactNode }) => {
     <div>
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-[72px] lg:flex-col border-r border-light-200 dark:border-dark-200">
         <div className="flex grow flex-col items-center justify-between gap-y-5 overflow-y-auto bg-light-secondary dark:bg-dark-secondary px-2 py-8 shadow-sm shadow-light-200/10 dark:shadow-black/25">
-          <Link
-            className="p-2.5 rounded-full bg-[#24A0ED] text-white hover:bg-[#1a8fd4] hover:scale-105 transition duration-200"
-            href="/"
-          >
-            <Plus size={19} className="cursor-pointer" />
-          </Link>
+          {/* Spacer keeps the nav group vertically centered (its original position)
+              now that the New Thread button lives inside the group. */}
+          <div aria-hidden className="shrink-0" />
           <VerticalIconContainer>
+            <Link
+              href="/"
+              className="relative flex flex-col items-center justify-center space-y-0.5 cursor-pointer w-full py-2 rounded-lg text-black/60 dark:text-white/60"
+              title="New Thread"
+            >
+              <div className="group rounded-full bg-[#24A0ED] text-white hover:bg-[#1a8fd4] transition duration-200">
+                <Plus
+                  size={25}
+                  className="group-hover:scale-105 transition duration:200 m-1.5"
+                />
+              </div>
+              <p className="text-[10px] text-black/60 dark:text-white/60">
+                New
+              </p>
+            </Link>
             {navLinks.map((link, i) => (
               <Link
                 key={i}

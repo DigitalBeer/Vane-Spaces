@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { formatTimeDifference } from '@/lib/utils';
 import { SpaceIcon as SpaceIconType } from '@/lib/db/schema';
-import EmojiPicker from '@/components/EmojiPicker';
+import CreateSpaceModal from '@/components/CreateSpaceModal';
 
 interface Space {
   id: string;
@@ -34,133 +34,6 @@ const SpaceIconDisplay = ({ icon }: { icon: SpaceIconType | null }) => {
   );
 };
 
-const CreateSpaceModal = ({
-  onClose,
-  onCreated,
-}: {
-  onClose: () => void;
-  onCreated: (space: Space) => void;
-}) => {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedColor, setSelectedColor] = useState('#6366f1');
-  const [emojiInput, setEmojiInput] = useState('');
-  const [iconType, setIconType] = useState<'color' | 'emoji'>('color');
-  const [loading, setLoading] = useState(false);
-
-  const colors = [
-    '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
-    '#f97316', '#eab308', '#22c55e', '#14b8a6',
-    '#3b82f6', '#06b6d4', '#64748b', '#78716c',
-  ];
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setLoading(true);
-    try {
-      const icon =
-        iconType === 'emoji' && emojiInput.trim()
-          ? { type: 'emoji' as const, value: emojiInput.trim() }
-          : { type: 'color' as const, value: selectedColor };
-
-      const res = await fetch('/api/spaces', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), description: description.trim() || null, icon }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.message || 'Failed to create space');
-        return;
-      }
-      onCreated({ ...data.space, chatCount: 0 });
-      onClose();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-light-primary dark:bg-dark-primary rounded-2xl border border-light-200 dark:border-dark-200 p-6 w-full max-w-md mx-4 shadow-xl">
-        <h2 className="text-lg font-semibold mb-4">New Space</h2>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label className="block text-sm text-black/60 dark:text-white/60 mb-1">Name</label>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#24A0ED]"
-              placeholder="e.g. Research, Work, Personal"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-black/60 dark:text-white/60 mb-1">Description (optional)</label>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-lg bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#24A0ED]"
-              placeholder="What is this Space for?"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-black/60 dark:text-white/60 mb-1">Icon</label>
-            <div className="flex gap-2 mb-2">
-              <button
-                type="button"
-                onClick={() => setIconType('color')}
-                className={`px-3 py-1 text-xs rounded-full border transition ${iconType === 'color' ? 'bg-[#24A0ED] text-white border-[#24A0ED]' : 'border-light-200 dark:border-dark-200 text-black/60 dark:text-white/60'}`}
-              >
-                Color
-              </button>
-              <button
-                type="button"
-                onClick={() => setIconType('emoji')}
-                className={`px-3 py-1 text-xs rounded-full border transition ${iconType === 'emoji' ? 'bg-[#24A0ED] text-white border-[#24A0ED]' : 'border-light-200 dark:border-dark-200 text-black/60 dark:text-white/60'}`}
-              >
-                Emoji
-              </button>
-            </div>
-            {iconType === 'color' ? (
-              <div className="flex flex-wrap gap-2">
-                {colors.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setSelectedColor(c)}
-                    className={`w-7 h-7 rounded-lg transition ${selectedColor === c ? 'ring-2 ring-offset-2 ring-[#24A0ED] dark:ring-offset-dark-primary' : ''}`}
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-              </div>
-            ) : (
-              <EmojiPicker value={emojiInput} onChange={setEmojiInput} />
-            )}
-          </div>
-          <div className="flex gap-2 justify-end pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm rounded-lg border border-light-200 dark:border-dark-200 hover:bg-light-secondary dark:hover:bg-dark-secondary transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !name.trim()}
-              className="px-4 py-2 text-sm rounded-lg bg-[#24A0ED] text-white hover:bg-[#1a8fd4] disabled:opacity-50 transition"
-            >
-              {loading ? 'Creating…' : 'Create'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
 const Page = () => {
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,7 +54,12 @@ const Page = () => {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
-    if (!confirm('Delete this Space? Threads will remain but lose their Space association.')) return;
+    if (
+      !confirm(
+        'Delete this Space? Threads will remain but lose their Space association.',
+      )
+    )
+      return;
     const res = await fetch(`/api/spaces/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setSpaces((prev) => prev.filter((s) => s.id !== id));
@@ -213,7 +91,9 @@ const Page = () => {
           <div className="flex items-center justify-center lg:justify-end gap-2">
             <span className="inline-flex items-center gap-1 text-xs text-black/60 dark:text-white/60 rounded-full border border-black/20 dark:border-white/20 px-2 py-0.5">
               <LayoutGrid size={14} />
-              {loading ? 'Loading…' : `${spaces.length} ${spaces.length === 1 ? 'space' : 'spaces'}`}
+              {loading
+                ? 'Loading…'
+                : `${spaces.length} ${spaces.length === 1 ? 'space' : 'spaces'}`}
             </span>
             <button
               onClick={() => setShowCreate(true)}
@@ -229,7 +109,9 @@ const Page = () => {
       {showCreate && (
         <CreateSpaceModal
           onClose={() => setShowCreate(false)}
-          onCreated={(space) => setSpaces((prev) => [space, ...prev])}
+          onCreated={(space) =>
+            setSpaces((prev) => [{ ...space, chatCount: 0 }, ...prev])
+          }
         />
       )}
 
@@ -257,9 +139,14 @@ const Page = () => {
           <div className="flex items-center justify-center w-12 h-12 rounded-2xl border border-light-200 dark:border-dark-200 bg-light-secondary dark:bg-dark-secondary">
             <LayoutGrid className="text-black/70 dark:text-white/70" />
           </div>
-          <p className="mt-2 text-black/70 dark:text-white/70 text-sm">No Spaces yet.</p>
+          <p className="mt-2 text-black/70 dark:text-white/70 text-sm">
+            No Spaces yet.
+          </p>
           <p className="mt-1 text-black/70 dark:text-white/70 text-sm">
-            <button onClick={() => setShowCreate(true)} className="text-sky-400 hover:underline">
+            <button
+              onClick={() => setShowCreate(true)}
+              className="text-sky-400 hover:underline"
+            >
               Create a Space
             </button>{' '}
             to group related threads with custom instructions.
@@ -309,7 +196,10 @@ const Page = () => {
                 </div>
 
                 <div className="flex items-center gap-3 text-xs text-black/50 dark:text-white/50 mt-auto">
-                  <span>{space.chatCount} {space.chatCount === 1 ? 'thread' : 'threads'}</span>
+                  <span>
+                    {space.chatCount}{' '}
+                    {space.chatCount === 1 ? 'thread' : 'threads'}
+                  </span>
                   <span className="inline-flex items-center gap-1">
                     <ClockIcon size={11} />
                     {formatTimeDifference(new Date(), space.createdAt)} ago

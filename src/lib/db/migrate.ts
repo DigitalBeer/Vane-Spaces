@@ -268,6 +268,46 @@ fs.readdirSync(migrationsFolder)
 
         db.exec('DROP TABLE messages;');
         db.exec('ALTER TABLE messages_new RENAME TO messages;');
+      } else if (migrationName === '0004') {
+        /* Full-text search index over messages (query + assistant text blocks). */
+        db.exec(`
+          CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+            messageId UNINDEXED,
+            chatId UNINDEXED,
+            query,
+            response,
+            tokenize = 'porter unicode61'
+          );
+        `);
+
+        const rows = db
+          .prepare(
+            'SELECT messageId, chatId, query, responseBlocks FROM messages',
+          )
+          .all();
+
+        const insertFts = db.prepare(`
+          INSERT INTO messages_fts (messageId, chatId, query, response)
+          VALUES (?, ?, ?, ?)
+        `);
+
+        rows.forEach((m: any) => {
+          let blocks = m.responseBlocks;
+          while (typeof blocks === 'string') {
+            try {
+              blocks = JSON.parse(blocks || '[]');
+            } catch {
+              blocks = [];
+            }
+          }
+          const response = Array.isArray(blocks)
+            ? blocks
+                .filter((b: any) => b && b.type === 'text')
+                .map((b: any) => b.data || '')
+                .join('\n')
+            : '';
+          insertFts.run(m.messageId, m.chatId, m.query || '', response);
+        });
       } else {
         // Execute each statement separately
         statements.forEach((stmt) => {

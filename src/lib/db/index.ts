@@ -9,4 +9,5 @@ const db = drizzle(sqlite, {
   schema: schema,
 });
 
+export { sqlite };
 export default db;

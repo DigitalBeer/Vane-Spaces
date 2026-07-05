@@ -1,5 +1,6 @@
 import db from '@/lib/db';
 import { chats, messages, spaces } from '@/lib/db/schema';
+import { deleteChatFts } from '@/lib/db/messagesFts';
 import { eq } from 'drizzle-orm';
 
 export const GET = async (
@@ -68,7 +69,10 @@ export const PATCH = async (
     if ('spaceId' in body) updates.spaceId = body.spaceId ?? null;
 
     if (Object.keys(updates).length === 0) {
-      return Response.json({ message: 'No valid fields to update' }, { status: 400 });
+      return Response.json(
+        { message: 'No valid fields to update' },
+        { status: 400 },
+      );
     }
 
     await db.update(chats).set(updates).where(eq(chats.id, id)).execute();
@@ -78,7 +82,10 @@ export const PATCH = async (
     return Response.json({ chat: updated }, { status: 200 });
   } catch (err) {
     console.error('Error updating chat:', err);
-    return Response.json({ message: 'An error has occurred.' }, { status: 500 });
+    return Response.json(
+      { message: 'An error has occurred.' },
+      { status: 500 },
+    );
   }
 };
 
@@ -99,6 +106,7 @@ export const DELETE = async (
 
     await db.delete(chats).where(eq(chats.id, id)).execute();
     await db.delete(messages).where(eq(messages.chatId, id)).execute();
+    deleteChatFts(id);
 
     return Response.json(
       { message: 'Chat deleted successfully' },

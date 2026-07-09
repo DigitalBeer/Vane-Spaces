@@ -75,6 +75,9 @@ export const spaces = sqliteTable('spaces', {
   webSources: text('webSources', { mode: 'json' })
     .$type<SpaceWebSource[]>()
     .default(sql`'[]'`),
+  pinnedQueries: text('pinnedQueries', { mode: 'json' })
+    .$type<string[]>()
+    .default(sql`'[]'`),
   createdAt: text('createdAt').notNull(),
   updatedAt: text('updatedAt').notNull(),
 });

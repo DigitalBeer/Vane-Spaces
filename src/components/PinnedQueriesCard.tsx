@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
@@ -25,7 +27,7 @@ export default function PinnedQueriesCard({ spaceId, initial }: { spaceId: strin
   const remove = (i: number) => persist(queries.filter((_, idx) => idx !== i));
 
   return (
-    <div className="bg-light-secondary dark:bg-dark-secondary rounded-xl p-4 border border-light-200 dark:border-dark-200">
+    <section className="rounded-2xl border border-light-200 dark:border-dark-200 bg-light-primary dark:bg-dark-primary p-5">
       <h2 className="font-semibold text-sm mb-1">Pinned Queries</h2>
       <p className="text-xs text-black/50 dark:text-white/50 mb-3">One-click starting points for this Space.</p>
       {queries.length === 0 && (
@@ -41,6 +43,6 @@ export default function PinnedQueriesCard({ spaceId, initial }: { spaceId: strin
         <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} placeholder="Add a query..." className="flex-1 text-sm bg-transparent border border-light-200 dark:border-dark-200 rounded-lg px-2 py-1 focus:outline-none" />
         <button type="button" onClick={add} className="text-sm px-3 py-1 rounded-lg bg-[#24A0ED] text-white hover:bg-[#1a8fd4]">Add</button>
       </div>
-    </div>
+    </section>
   );
 }

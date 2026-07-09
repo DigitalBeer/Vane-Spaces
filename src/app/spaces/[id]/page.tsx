@@ -26,6 +26,7 @@ import {
   DBFile,
 } from '@/lib/db/schema';
 import EmojiPicker from '@/components/EmojiPicker';
+import PinnedQueriesCard from '@/components/PinnedQueriesCard';
 
 interface SearchHit {
   chatId: string;
@@ -72,6 +73,7 @@ interface Space {
   defaultSourceScope: 'space' | 'web' | 'both';
   files: DBFile[];
   webSources: SpaceWebSource[];
+  pinnedQueries: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -706,6 +708,9 @@ const Page = () => {
               </div>
             )}
           </section>
+
+          {/* Pinned Queries */}
+          <PinnedQueriesCard spaceId={id} initial={space.pinnedQueries ?? []} />
 
           {/* Web Sources */}
           <section className="rounded-2xl border border-light-200 dark:border-dark-200 bg-light-primary dark:bg-dark-primary p-5">

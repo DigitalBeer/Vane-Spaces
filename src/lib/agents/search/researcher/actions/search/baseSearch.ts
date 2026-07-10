@@ -17,8 +17,15 @@ export const executeSearch = async (input: {
   session: InstanceType<typeof SessionManager>;
   llm: BaseLLM<any>;
   embedding: BaseEmbedding<any>;
+  excludedDomains?: string[];
 }) => {
   const researchBlock = input.researchBlock;
+
+  const exclusionSuffix = (input.excludedDomains ?? [])
+    .map((d: string) => `-site:${d}`)
+    .join(' ');
+  const applyExclusions = (q: string): string =>
+    exclusionSuffix ? `${q} ${exclusionSuffix}` : q;
 
   researchBlock.data.subSteps.push({
     id: crypto.randomUUID(),
@@ -41,7 +48,7 @@ export const executeSearch = async (input: {
     const results: Chunk[] = [];
 
     const search = async (q: string) => {
-      const res = await searchSearxng(q, {
+      const res = await searchSearxng(applyExclusions(q), {
         ...(input.searchConfig ? input.searchConfig : {}),
       });
 
@@ -191,7 +198,7 @@ export const executeSearch = async (input: {
     const searchResults: Chunk[] = [];
 
     const search = async (q: string) => {
-      const res = await searchSearxng(q, {
+      const res = await searchSearxng(applyExclusions(q), {
         ...(input.searchConfig ? input.searchConfig : {}),
       });
 

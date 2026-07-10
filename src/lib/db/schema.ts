@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { text, integer, sqliteTable } from 'drizzle-orm/sqlite-core';
+import { text, integer, sqliteTable, index } from 'drizzle-orm/sqlite-core';
 import { Block } from '../types';
 import { SearchSources } from '../agents/search/types';
 
@@ -51,6 +51,10 @@ export const chats = sqliteTable('chats', {
     .$type<DBFile[]>()
     .default(sql`'[]'`),
   spaceId: text('spaceId'),
+  origin: text('origin', { enum: ['user', 'digest'] })
+    .notNull()
+    .default('user'),
+  digestId: text('digestId'),
 });
 
 export const spaces = sqliteTable('spaces', {
@@ -81,3 +85,40 @@ export const spaces = sqliteTable('spaces', {
   createdAt: text('createdAt').notNull(),
   updatedAt: text('updatedAt').notNull(),
 });
+
+export const digestTopics = sqliteTable('digest_topics', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  spaceId: text('spaceId'),
+  queries: text('queries', { mode: 'json' })
+    .$type<string[]>()
+    .default(sql`'[]'`),
+  instructions: text('instructions'),
+  excludedDomains: text('excludedDomains', { mode: 'json' })
+    .$type<string[]>()
+    .default(sql`'[]'`),
+  frequency: text('frequency', { enum: ['daily', 'weekly'] }).notNull(),
+  timeOfDay: text('timeOfDay').notNull(),
+  dayOfWeek: integer('dayOfWeek'),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  sources: text('sources', { mode: 'json' })
+    .$type<SearchSources[]>()
+    .default(sql`'[]'`),
+  optimizationMode: text('optimizationMode', {
+    enum: ['speed', 'balanced', 'quality'],
+  })
+    .notNull()
+    .default('balanced'),
+  chatModelProviderId: text('chatModelProviderId').notNull(),
+  chatModelKey: text('chatModelKey').notNull(),
+  embeddingModelProviderId: text('embeddingModelProviderId').notNull(),
+  embeddingModelKey: text('embeddingModelKey').notNull(),
+  lastRunAt: text('lastRunAt'),
+  nextRunAt: text('nextRunAt').notNull(),
+  lastRunError: text('lastRunError'),
+  lastRunChatId: text('lastRunChatId'),
+  createdAt: text('createdAt').notNull(),
+  updatedAt: text('updatedAt').notNull(),
+}, (table) => ({
+  dueIdx: index('idx_digest_topics_due').on(table.enabled, table.nextRunAt),
+}));

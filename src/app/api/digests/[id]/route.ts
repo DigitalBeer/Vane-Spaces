@@ -41,6 +41,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       const frequency = (updates.frequency ?? existing.frequency) as 'daily' | 'weekly';
       const timeOfDay = (updates.timeOfDay ?? existing.timeOfDay) as string;
       const dayOfWeek = ('dayOfWeek' in updates ? updates.dayOfWeek : existing.dayOfWeek) as number | null;
+      if (
+        frequency === 'weekly' &&
+        (dayOfWeek === null || Number.isNaN(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6)
+      ) {
+        return Response.json(
+          { message: 'dayOfWeek (0-6) is required when frequency is weekly.' },
+          { status: 400 },
+        );
+      }
       updates.nextRunAt = computeNextRunAt({ frequency, timeOfDay, dayOfWeek }, new Date());
     }
 

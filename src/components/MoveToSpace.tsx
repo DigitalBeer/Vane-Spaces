@@ -7,9 +7,10 @@ import {
   PopoverPanel,
   Transition,
 } from '@headlessui/react';
-import { LayoutGrid, X } from 'lucide-react';
+import { LayoutGrid, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { SpaceSummary } from '@/lib/hooks/useChat';
+import CreateSpaceModal, { CreatedSpace } from '@/components/CreateSpaceModal';
 
 interface Space {
   id: string;
@@ -48,7 +49,10 @@ const MoveToSpace = ({
 }: MoveToSpaceProps) => {
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [loadingSpaces, setLoadingSpaces] = useState(false);
-  const [movingTo, setMovingTo] = useState<string | null | 'remove'>(undefined as any);
+  const [movingTo, setMovingTo] = useState<string | null | 'remove'>(
+    undefined as any,
+  );
+  const [showCreate, setShowCreate] = useState(false);
 
   const fetchSpaces = async () => {
     if (spaces.length > 0) return;
@@ -66,7 +70,8 @@ const MoveToSpace = ({
 
   const move = async (
     spaceId: string | null,
-    close: () => void,
+    close?: () => void,
+    knownSpace?: Space,
   ) => {
     setMovingTo(spaceId ?? 'remove');
     try {
@@ -80,100 +85,139 @@ const MoveToSpace = ({
         return;
       }
       const targetSpace = spaceId
-        ? spaces.find((s) => s.id === spaceId) ?? null
+        ? (knownSpace ?? spaces.find((s) => s.id === spaceId) ?? null)
         : null;
       const info: SpaceSummary | null = targetSpace
         ? { id: targetSpace.id, name: targetSpace.name, icon: targetSpace.icon }
         : null;
       onMoved(spaceId, info);
-      close();
-      toast.success(spaceId ? `Moved to ${targetSpace?.name}` : 'Removed from Space');
+      close?.();
+      toast.success(
+        spaceId ? `Moved to ${targetSpace?.name}` : 'Removed from Space',
+      );
     } finally {
       setMovingTo(undefined as any);
     }
   };
 
+  const handleCreated = (created: CreatedSpace) => {
+    const space: Space = {
+      id: created.id,
+      name: created.name,
+      icon: created.icon,
+    };
+    setSpaces((prev) => [space, ...prev]);
+    setShowCreate(false);
+    move(created.id, undefined, space);
+  };
+
   return (
-    <Popover className="relative">
-      {({ close }) => (
-        <>
-          <PopoverButton
-            onClick={fetchSpaces}
-            className={
-              buttonClassName ??
-              'p-2 rounded-lg hover:bg-light-secondary dark:hover:bg-dark-secondary transition-colors duration-200'
-            }
-            title="Move to Space"
-          >
-            <LayoutGrid size={16} className="text-black/60 dark:text-white/60" />
-          </PopoverButton>
-          <Transition
-            as={Fragment}
-            enter="transition ease-out duration-200"
-            enterFrom={`opacity-0 ${popoverDirection === 'up' ? '-translate-y-1' : 'translate-y-1'}`}
-            enterTo="opacity-100 translate-y-0"
-            leave="transition ease-in duration-150"
-            leaveFrom="opacity-100 translate-y-0"
-            leaveTo={`opacity-0 ${popoverDirection === 'up' ? '-translate-y-1' : 'translate-y-1'}`}
-          >
-            <PopoverPanel className={`absolute right-0 w-64 rounded-2xl bg-light-primary dark:bg-dark-primary border border-light-200 dark:border-dark-200 shadow-xl shadow-black/10 dark:shadow-black/30 z-50 ${popoverDirection === 'up' ? 'bottom-full mb-2 origin-bottom-right' : 'mt-2 origin-top-right'}`}>
-              <div className="p-3">
-                <p className="text-xs font-medium text-black/40 dark:text-white/40 uppercase tracking-wide mb-2">
-                  Move to Space
-                </p>
-                {loadingSpaces ? (
-                  <p className="text-xs text-black/40 dark:text-white/40 py-2 text-center">
-                    Loading…
+    <>
+      <Popover className="relative">
+        {({ close }) => (
+          <>
+            <PopoverButton
+              onClick={fetchSpaces}
+              className={
+                buttonClassName ??
+                'p-2 rounded-lg hover:bg-light-secondary dark:hover:bg-dark-secondary transition-colors duration-200'
+              }
+              title="Move to Space"
+            >
+              <LayoutGrid
+                size={16}
+                className="text-black/60 dark:text-white/60"
+              />
+            </PopoverButton>
+            <Transition
+              as={Fragment}
+              enter="transition ease-out duration-200"
+              enterFrom={`opacity-0 ${popoverDirection === 'up' ? '-translate-y-1' : 'translate-y-1'}`}
+              enterTo="opacity-100 translate-y-0"
+              leave="transition ease-in duration-150"
+              leaveFrom="opacity-100 translate-y-0"
+              leaveTo={`opacity-0 ${popoverDirection === 'up' ? '-translate-y-1' : 'translate-y-1'}`}
+            >
+              <PopoverPanel
+                className={`absolute right-0 w-64 rounded-2xl bg-light-primary dark:bg-dark-primary border border-light-200 dark:border-dark-200 shadow-xl shadow-black/10 dark:shadow-black/30 z-50 ${popoverDirection === 'up' ? 'bottom-full mb-2 origin-bottom-right' : 'mt-2 origin-top-right'}`}
+              >
+                <div className="p-3">
+                  <p className="text-xs font-medium text-black/40 dark:text-white/40 uppercase tracking-wide mb-2">
+                    Move to Space
                   </p>
-                ) : spaces.length === 0 ? (
-                  <p className="text-xs text-black/40 dark:text-white/40 py-2 text-center">
-                    No Spaces yet
-                  </p>
-                ) : (
-                  <div className="space-y-0.5 max-h-56 overflow-y-auto">
-                    {spaces.map((space) => (
-                      <button
-                        key={space.id}
-                        disabled={!!movingTo}
-                        onClick={() => move(space.id, close)}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors duration-150 ${
-                          currentSpaceId === space.id
-                            ? 'bg-light-secondary dark:bg-dark-secondary'
-                            : 'hover:bg-light-secondary dark:hover:bg-dark-secondary'
-                        }`}
-                      >
-                        <SpaceIconMini icon={space.icon} />
-                        <span className="flex-1 text-sm text-black dark:text-white truncate">
-                          {space.name}
-                        </span>
-                        {currentSpaceId === space.id && (
-                          <span className="text-[10px] text-[#24A0ED] font-medium">
-                            Current
+                  {loadingSpaces ? (
+                    <p className="text-xs text-black/40 dark:text-white/40 py-2 text-center">
+                      Loading…
+                    </p>
+                  ) : spaces.length === 0 ? (
+                    <p className="text-xs text-black/40 dark:text-white/40 py-2 text-center">
+                      No Spaces yet
+                    </p>
+                  ) : (
+                    <div className="space-y-0.5 max-h-56 overflow-y-auto">
+                      {spaces.map((space) => (
+                        <button
+                          key={space.id}
+                          disabled={!!movingTo}
+                          onClick={() => move(space.id, close)}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors duration-150 ${
+                            currentSpaceId === space.id
+                              ? 'bg-light-secondary dark:bg-dark-secondary'
+                              : 'hover:bg-light-secondary dark:hover:bg-dark-secondary'
+                          }`}
+                        >
+                          <SpaceIconMini icon={space.icon} />
+                          <span className="flex-1 text-sm text-black dark:text-white truncate">
+                            {space.name}
                           </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {currentSpaceId && (
-                  <>
-                    <div className="border-t border-light-200 dark:border-dark-200 my-2" />
+                          {currentSpaceId === space.id && (
+                            <span className="text-[10px] text-[#24A0ED] font-medium">
+                              Current
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="border-t border-light-200 dark:border-dark-200 my-2" />
+                  <button
+                    disabled={!!movingTo}
+                    onClick={() => {
+                      close();
+                      setShowCreate(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-light-secondary dark:hover:bg-dark-secondary transition-colors duration-150"
+                  >
+                    <Plus size={14} className="text-[#24A0ED]" />
+                    <span className="text-sm text-[#24A0ED] font-medium">
+                      New Space
+                    </span>
+                  </button>
+                  {currentSpaceId && (
                     <button
                       disabled={!!movingTo}
                       onClick={() => move(null, close)}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-150"
                     >
                       <X size={14} className="text-red-500" />
-                      <span className="text-sm text-red-500">Remove from Space</span>
+                      <span className="text-sm text-red-500">
+                        Remove from Space
+                      </span>
                     </button>
-                  </>
-                )}
-              </div>
-            </PopoverPanel>
-          </Transition>
-        </>
+                  )}
+                </div>
+              </PopoverPanel>
+            </Transition>
+          </>
+        )}
+      </Popover>
+      {showCreate && (
+        <CreateSpaceModal
+          onClose={() => setShowCreate(false)}
+          onCreated={handleCreated}
+        />
       )}
-    </Popover>
+    </>
   );
 };
 

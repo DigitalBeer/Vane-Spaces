@@ -6,6 +6,7 @@ import { getWriterPrompt } from '@/lib/prompts/search/writer';
 import { WidgetExecutor } from './widgets';
 import db from '@/lib/db';
 import { messages } from '@/lib/db/schema';
+import { indexMessageFts } from '@/lib/db/messagesFts';
 import { and, eq, gt } from 'drizzle-orm';
 import { TextBlock } from '@/lib/types';
 import { getTokenCount } from '@/lib/utils/splitText';
@@ -177,11 +178,13 @@ class SearchAgent {
 
     session.emit('end', {});
 
+    const finalBlocks = session.getAllBlocks();
+
     await db
       .update(messages)
       .set({
         status: 'completed',
-        responseBlocks: session.getAllBlocks(),
+        responseBlocks: finalBlocks,
       })
       .where(
         and(
@@ -190,6 +193,13 @@ class SearchAgent {
         ),
       )
       .execute();
+
+    indexMessageFts({
+      messageId: input.messageId,
+      chatId: input.chatId,
+      query: input.followUp,
+      responseBlocks: finalBlocks,
+    });
   }
 }
 

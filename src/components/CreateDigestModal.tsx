@@ -4,27 +4,47 @@ import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import ModelDropdownPair from './ModelDropdownPair';
 
-type CreateDigestModalProps = { onClose: () => void; onCreated: (digest: unknown) => void };
+export type EditableDigest = {
+  id: string;
+  name: string;
+  queries: string[];
+  instructions: string | null;
+  excludedDomains: string[];
+  frequency: 'daily' | 'weekly';
+  timeOfDay: string;
+  dayOfWeek: number | null;
+  optimizationMode: 'speed' | 'balanced' | 'quality';
+  chatModelProviderId: string;
+  chatModelKey: string;
+  embeddingModelProviderId: string;
+  embeddingModelKey: string;
+};
 
-const CreateDigestModal: React.FC<CreateDigestModalProps> = ({ onClose, onCreated }) => {
+type CreateDigestModalProps = {
+  onClose: () => void;
+  onSaved: (digest: unknown) => void;
+  editing?: EditableDigest | null;
+};
+
+const CreateDigestModal: React.FC<CreateDigestModalProps> = ({ onClose, onSaved, editing }) => {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
   }, []);
 
-  const [name, setName] = useState('');
-  const [queries, setQueries] = useState<string[]>(['']);
-  const [frequency, setFrequency] = useState<'daily' | 'weekly'>('daily');
-  const [dayOfWeek, setDayOfWeek] = useState<number>(1);
-  const [timeOfDay, setTimeOfDay] = useState('09:00');
-  const [optimizationMode, setOptimizationMode] = useState<'speed' | 'balanced' | 'quality'>('balanced');
-  const [chatProviderId, setChatProviderId] = useState('');
-  const [chatModelKey, setChatModelKey] = useState('');
-  const [embedProviderId, setEmbedProviderId] = useState('');
-  const [embedModelKey, setEmbedModelKey] = useState('');
-  const [instructions, setInstructions] = useState('');
-  const [excluded, setExcluded] = useState('');
+  const [name, setName] = useState(editing?.name ?? '');
+  const [queries, setQueries] = useState<string[]>(editing?.queries.length ? editing.queries : ['']);
+  const [frequency, setFrequency] = useState<'daily' | 'weekly'>(editing?.frequency ?? 'daily');
+  const [dayOfWeek, setDayOfWeek] = useState<number>(editing?.dayOfWeek ?? 1);
+  const [timeOfDay, setTimeOfDay] = useState(editing?.timeOfDay ?? '09:00');
+  const [optimizationMode, setOptimizationMode] = useState<'speed' | 'balanced' | 'quality'>(editing?.optimizationMode ?? 'balanced');
+  const [chatProviderId, setChatProviderId] = useState(editing?.chatModelProviderId ?? '');
+  const [chatModelKey, setChatModelKey] = useState(editing?.chatModelKey ?? '');
+  const [embedProviderId, setEmbedProviderId] = useState(editing?.embeddingModelProviderId ?? '');
+  const [embedModelKey, setEmbedModelKey] = useState(editing?.embeddingModelKey ?? '');
+  const [instructions, setInstructions] = useState(editing?.instructions ?? '');
+  const [excluded, setExcluded] = useState(editing?.excludedDomains.join('\n') ?? '');
   const [loading, setLoading] = useState(false);
 
   const setQuery = (i: number, v: string): void => setQueries((qs: string[]) => qs.map((q: string, idx: number) => (idx === i ? v : q)));
@@ -40,27 +60,28 @@ const CreateDigestModal: React.FC<CreateDigestModalProps> = ({ onClose, onCreate
     const excludedDomains: string[] = excluded.split(/[\n,]/).map((d: string) => d.trim()).filter((d: string) => d.length > 0);
     setLoading(true);
     try {
-      const res = await fetch('/api/digests', {
-        method: 'POST',
+      const body = {
+        name: name.trim(),
+        queries: cleanQueries,
+        frequency,
+        timeOfDay,
+        dayOfWeek: frequency === 'weekly' ? dayOfWeek : null,
+        optimizationMode,
+        chatModelProviderId: chatProviderId,
+        chatModelKey,
+        embeddingModelProviderId: embedProviderId,
+        embeddingModelKey: embedModelKey,
+        instructions: instructions.trim() || null,
+        excludedDomains,
+      };
+      const res = await fetch(editing ? `/api/digests/${editing.id}` : '/api/digests', {
+        method: editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          queries: cleanQueries,
-          frequency,
-          timeOfDay,
-          dayOfWeek: frequency === 'weekly' ? dayOfWeek : null,
-          optimizationMode,
-          chatModelProviderId: chatProviderId,
-          chatModelKey,
-          embeddingModelProviderId: embedProviderId,
-          embeddingModelKey: embedModelKey,
-          instructions: instructions.trim() || null,
-          excludedDomains,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) { toast.error(data.message || 'Failed to create digest'); return; }
-      onCreated(data.digest);
+      if (!res.ok) { toast.error(data.message || `Failed to ${editing ? 'save' : 'create'} digest`); return; }
+      onSaved(data.digest);
       onClose();
     } finally {
       setLoading(false);
@@ -72,7 +93,7 @@ const CreateDigestModal: React.FC<CreateDigestModalProps> = ({ onClose, onCreate
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-light-primary dark:bg-dark-primary rounded-2xl border border-light-200 dark:border-dark-200 p-6 w-full max-w-lg mx-4 shadow-xl max-h-[85vh] overflow-y-auto">
-        <h2 className="text-lg font-semibold mb-4">New Digest Topic</h2>
+        <h2 className="text-lg font-semibold mb-4">{editing ? 'Edit Digest Topic' : 'New Digest Topic'}</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
             type="text"
@@ -176,24 +197,30 @@ const CreateDigestModal: React.FC<CreateDigestModalProps> = ({ onClose, onCreate
               Quality
             </button>
           </div>
-          <ModelDropdownPair
-            kind="chat"
-            providerId={chatProviderId}
-            modelKey={chatModelKey}
-            onChange={(p: string, m: string) => {
-              setChatProviderId(p);
-              setChatModelKey(m);
-            }}
-          />
-          <ModelDropdownPair
-            kind="embedding"
-            providerId={embedProviderId}
-            modelKey={embedModelKey}
-            onChange={(p: string, m: string) => {
-              setEmbedProviderId(p);
-              setEmbedModelKey(m);
-            }}
-          />
+          <div>
+            <label className="block text-sm text-black/60 dark:text-white/60 mb-1">Chat model</label>
+            <ModelDropdownPair
+              kind="chat"
+              providerId={chatProviderId}
+              modelKey={chatModelKey}
+              onChange={(p: string, m: string) => {
+                setChatProviderId(p);
+                setChatModelKey(m);
+              }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-black/60 dark:text-white/60 mb-1">Embedding model</label>
+            <ModelDropdownPair
+              kind="embedding"
+              providerId={embedProviderId}
+              modelKey={embedModelKey}
+              onChange={(p: string, m: string) => {
+                setEmbedProviderId(p);
+                setEmbedModelKey(m);
+              }}
+            />
+          </div>
           <details>
             <summary className="text-sm cursor-pointer text-black/60 dark:text-white/60">Advanced</summary>
             <textarea
@@ -222,7 +249,7 @@ const CreateDigestModal: React.FC<CreateDigestModalProps> = ({ onClose, onCreate
               disabled={loading}
               className="text-sm py-1 px-4 bg-[#24A0ED] text-white rounded"
             >
-              {loading ? 'Creating…' : 'Create'}
+              {editing ? (loading ? 'Saving…' : 'Save') : (loading ? 'Creating…' : 'Create')}
             </button>
           </div>
         </form>

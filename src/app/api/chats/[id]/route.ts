@@ -1,5 +1,5 @@
 import db from '@/lib/db';
-import { chats, messages, spaces } from '@/lib/db/schema';
+import { chats, messages, spaces, digestTopics } from '@/lib/db/schema';
 import { deleteChatFts } from '@/lib/db/messagesFts';
 import { eq } from 'drizzle-orm';
 
@@ -32,11 +32,22 @@ export const GET = async (
       }
     }
 
+    let digest: { id: string; name: string } | null = null;
+    if (chatExists.digestId) {
+      const digestRow = await db.query.digestTopics.findFirst({
+        where: eq(digestTopics.id, chatExists.digestId),
+      });
+      if (digestRow) {
+        digest = { id: digestRow.id, name: digestRow.name };
+      }
+    }
+
     return Response.json(
       {
         chat: chatExists,
         messages: chatMessages,
         space,
+        digest,
       },
       { status: 200 },
     );

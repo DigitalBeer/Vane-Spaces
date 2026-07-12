@@ -34,6 +34,11 @@ export type SpaceSummary = {
   icon: { type: 'emoji' | 'color'; value: string } | null;
 };
 
+export type DigestSummary = {
+  id: string;
+  name: string;
+};
+
 type ChatContext = {
   messages: Message[];
   sections: Section[];
@@ -44,6 +49,7 @@ type ChatContext = {
   chatId: string | undefined;
   spaceId: string | null;
   spaceInfo: SpaceSummary | null;
+  digestInfo: DigestSummary | null;
   optimizationMode: string;
   isMessagesLoaded: boolean;
   loading: boolean;
@@ -61,6 +67,7 @@ type ChatContext = {
   setFileIds: (fileIds: string[]) => void;
   setSpaceId: (spaceId: string | null) => void;
   setSpaceInfo: (info: SpaceSummary | null) => void;
+  setDigestInfo: (info: DigestSummary | null) => void;
   sendMessage: (
     message: string,
     messageId?: string,
@@ -194,6 +201,7 @@ const loadMessages = async (
   setFileIds: (fileIds: string[]) => void,
   setSpaceId: (spaceId: string | null) => void,
   setSpaceInfo: (info: SpaceSummary | null) => void,
+  setDigestInfo: (info: DigestSummary | null) => void,
 ) => {
   const res = await fetch(`/api/chats/${chatId}`, {
     method: 'GET',
@@ -257,6 +265,11 @@ const loadMessages = async (
   } else {
     setSpaceInfo(null);
   }
+  if (data.digest) {
+    setDigestInfo(data.digest);
+  } else {
+    setDigestInfo(null);
+  }
   setIsMessagesLoaded(true);
 };
 
@@ -265,6 +278,7 @@ export const chatContext = createContext<ChatContext>({
   chatId: '',
   spaceId: null,
   spaceInfo: null,
+  digestInfo: null,
   fileIds: [],
   files: [],
   sources: [],
@@ -288,6 +302,7 @@ export const chatContext = createContext<ChatContext>({
   setSources: () => {},
   setSpaceId: () => {},
   setSpaceInfo: () => {},
+  setDigestInfo: () => {},
   setOptimizationMode: () => {},
   setChatModelProvider: () => {},
   setEmbeddingModelProvider: () => {},
@@ -306,6 +321,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [chatId, setChatId] = useState<string | undefined>(params.chatId);
   const [spaceId, setSpaceId] = useState<string | null>(spaceIdFromQuery);
   const [spaceInfo, setSpaceInfo] = useState<SpaceSummary | null>(null);
+  const [digestInfo, setDigestInfo] = useState<DigestSummary | null>(null);
   const spaceIdRef = useRef<string | null>(spaceIdFromQuery);
   const [newChatCreated, setNewChatCreated] = useState(false);
 
@@ -584,6 +600,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         setFileIds,
         setSpaceId,
         setSpaceInfo,
+        setDigestInfo,
       );
     } else if (!chatId) {
       setNewChatCreated(true);
@@ -948,6 +965,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         chatId,
         spaceId,
         spaceInfo,
+        digestInfo,
         hasError,
         isMessagesLoaded,
         isReady,
@@ -960,6 +978,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         setSources,
         setSpaceId,
         setSpaceInfo,
+        setDigestInfo,
         setOptimizationMode,
         rewrite,
         stopGeneration,

@@ -11,6 +11,7 @@ import {
   FileText,
   Globe2Icon,
   LayoutGrid,
+  Newspaper,
   Plus,
   Trash2,
   X,
@@ -37,6 +38,11 @@ interface SpaceInfo {
   icon: { type: 'emoji' | 'color'; value: string } | null;
 }
 
+interface DigestInfo {
+  id: string;
+  name: string;
+}
+
 export interface Chat {
   id: string;
   title: string;
@@ -45,6 +51,7 @@ export interface Chat {
   files: { fileId: string; name: string }[];
   spaceId: string | null;
   space: SpaceInfo | null;
+  digest: DigestInfo | null;
 }
 
 const SpaceIconMini = ({ icon }: { icon: SpaceInfo['icon'] }) => {
@@ -512,6 +519,15 @@ const Page = () => {
                           <div className="w-3 h-3 rounded bg-indigo-500/30" />
                         )}
                         {chat.space.name}
+                      </Link>
+                    )}
+                    {chat.digest && (
+                      <Link
+                        href={`/digests?topic=${chat.digest.id}`}
+                        className="inline-flex items-center gap-1 text-xs border border-black/20 dark:border-white/20 rounded-full px-2 py-0.5 hover:text-[#24A0ED] transition-colors duration-150 shrink-0"
+                      >
+                        <Newspaper size={12} />
+                        {chat.digest.name}
                       </Link>
                     )}
                   </div>

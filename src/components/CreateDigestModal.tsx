@@ -26,6 +26,12 @@ type CreateDigestModalProps = {
   editing?: EditableDigest | null;
 };
 
+const OPTIMIZATION_MODE_DESCRIPTIONS: Record<'speed' | 'balanced' | 'quality', string> = {
+  speed: 'Prioritize speed and get the quickest possible answer.',
+  balanced: 'Find the right balance between speed and accuracy.',
+  quality: 'Get the most thorough and accurate answer (slower, more searches).',
+};
+
 const CreateDigestModal: React.FC<CreateDigestModalProps> = ({ onClose, onSaved, editing }) => {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -166,36 +172,42 @@ const CreateDigestModal: React.FC<CreateDigestModalProps> = ({ onClose, onSaved,
               onChange={(e) => setTimeOfDay(e.target.value)}
               className="w-full rounded-lg bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#24A0ED]"
             />
-            <p className="text-xs text-black/40 dark:text-white/40 mt-1">Times are in the server's timezone.</p>
+            <p className="text-xs text-black/40 dark:text-white/40 ml-3 whitespace-nowrap">Times are in the server's timezone.</p>
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setOptimizationMode('speed')}
-              className={`text-sm py-1 px-4 border rounded ${
-                optimizationMode === 'speed' ? 'bg-[#24A0ED] text-white' : 'border-light-200 dark:border-dark-200'
-              }`}
-            >
-              Speed
-            </button>
-            <button
-              type="button"
-              onClick={() => setOptimizationMode('balanced')}
-              className={`text-sm py-1 px-4 border rounded ${
-                optimizationMode === 'balanced' ? 'bg-[#24A0ED] text-white' : 'border-light-200 dark:border-dark-200'
-              }`}
-            >
-              Balanced
-            </button>
-            <button
-              type="button"
-              onClick={() => setOptimizationMode('quality')}
-              className={`text-sm py-1 px-4 border rounded ${
-                optimizationMode === 'quality' ? 'bg-[#24A0ED] text-white' : 'border-light-200 dark:border-dark-200'
-              }`}
-            >
-              Quality
-            </button>
+          <div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setOptimizationMode('speed')}
+                title={OPTIMIZATION_MODE_DESCRIPTIONS.speed}
+                className={`text-sm py-1 px-4 border rounded ${
+                  optimizationMode === 'speed' ? 'bg-[#24A0ED] text-white' : 'border-light-200 dark:border-dark-200'
+                }`}
+              >
+                Speed
+              </button>
+              <button
+                type="button"
+                onClick={() => setOptimizationMode('balanced')}
+                title={OPTIMIZATION_MODE_DESCRIPTIONS.balanced}
+                className={`text-sm py-1 px-4 border rounded ${
+                  optimizationMode === 'balanced' ? 'bg-[#24A0ED] text-white' : 'border-light-200 dark:border-dark-200'
+                }`}
+              >
+                Balanced
+              </button>
+              <button
+                type="button"
+                onClick={() => setOptimizationMode('quality')}
+                title={OPTIMIZATION_MODE_DESCRIPTIONS.quality}
+                className={`text-sm py-1 px-4 border rounded ${
+                  optimizationMode === 'quality' ? 'bg-[#24A0ED] text-white' : 'border-light-200 dark:border-dark-200'
+                }`}
+              >
+                Quality
+              </button>
+            </div>
+            <p className="text-xs text-black/40 dark:text-white/40 mt-1">{OPTIMIZATION_MODE_DESCRIPTIONS[optimizationMode]}</p>
           </div>
           <div>
             <label className="block text-sm text-black/60 dark:text-white/60 mb-1">Chat model</label>
@@ -221,20 +233,32 @@ const CreateDigestModal: React.FC<CreateDigestModalProps> = ({ onClose, onSaved,
               }}
             />
           </div>
-          <details>
+          <details className="flex flex-col gap-3">
             <summary className="text-sm cursor-pointer text-black/60 dark:text-white/60">Advanced</summary>
-            <textarea
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              className="w-full rounded-lg bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#24A0ED]"
-              placeholder="Enter instructions"
-            />
-            <textarea
-              value={excluded}
-              onChange={(e) => setExcluded(e.target.value)}
-              className="w-full rounded-lg bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#24A0ED]"
-              placeholder="one domain per line, e.g. example.com"
-            />
+            <div>
+              <label className="block text-sm text-black/60 dark:text-white/60 mb-1" title="Free-text steering for the model — tone, focus, what to skip. Not a hard filter, just guidance.">
+                Instructions
+              </label>
+              <textarea
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                className="w-full rounded-lg bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#24A0ED]"
+                placeholder="e.g. Focus on model releases and benchmarks, skip rumor pieces"
+              />
+              <p className="text-xs text-black/40 dark:text-white/40 mt-1">Steers how answers are written for this topic. Not guaranteed to be followed exactly.</p>
+            </div>
+            <div>
+              <label className="block text-sm text-black/60 dark:text-white/60 mb-1" title="Domains to exclude from search results for this topic — a hard filter.">
+                Excluded domains
+              </label>
+              <textarea
+                value={excluded}
+                onChange={(e) => setExcluded(e.target.value)}
+                className="w-full rounded-lg bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#24A0ED]"
+                placeholder="one domain per line, e.g. example.com"
+              />
+              <p className="text-xs text-black/40 dark:text-white/40 mt-1">Sources here are never used for this topic. Also populated automatically when you downvote a source in the feed.</p>
+            </div>
           </details>
           <div className="flex justify-end gap-2">
             <button

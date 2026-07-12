@@ -1,5 +1,5 @@
 import db from '@/lib/db';
-import { spaces } from '@/lib/db/schema';
+import { spaces, digestTopics } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 export const GET = async (req: Request) => {
@@ -20,9 +20,23 @@ export const GET = async (req: Request) => {
       spaceRows.filter(Boolean).map((s) => [s!.id, { id: s!.id, name: s!.name, icon: s!.icon }]),
     );
 
+    const digestIds = [...new Set(chats.map((c) => c.digestId).filter(Boolean))] as string[];
+    const digestRows = digestIds.length > 0
+      ? await Promise.all(
+          digestIds.map((id) =>
+            db.query.digestTopics.findFirst({ where: eq(digestTopics.id, id) }),
+          ),
+        )
+      : [];
+
+    const digestMap = new Map(
+      digestRows.filter(Boolean).map((d) => [d!.id, { id: d!.id, name: d!.name }]),
+    );
+
     const enriched = chats.map((c) => ({
       ...c,
       space: c.spaceId ? spaceMap.get(c.spaceId) ?? null : null,
+      digest: c.digestId ? digestMap.get(c.digestId) ?? null : null,
     }));
 
     return Response.json({ chats: enriched }, { status: 200 });

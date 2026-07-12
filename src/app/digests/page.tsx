@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Newspaper, Plus, Trash2, X, Pencil } from 'lucide-react';
 import CreateDigestModal, { EditableDigest } from '@/components/CreateDigestModal';
@@ -11,6 +12,8 @@ type EntrySource = { title: string; url: string };
 type DigestEntry = { chatId: string; title: string; createdAt: string; statuses: (string | null)[]; snippet: string; sources: EntrySource[] };
 
 const DigestsPage = () => {
+  const searchParams = useSearchParams();
+  const topicFromQuery = searchParams.get('topic');
   const [digests, setDigests] = useState<DigestTopic[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [entries, setEntries] = useState<DigestEntry[]>([]);
@@ -28,9 +31,11 @@ const DigestsPage = () => {
 
   useEffect(() => {
     loadDigests().then((list: DigestTopic[]) => {
-      setActiveId((prev: string | null) => prev ?? (list[0]?.id ?? null));
+      const fromQuery = topicFromQuery && list.some((d: DigestTopic) => d.id === topicFromQuery) ? topicFromQuery : null;
+      setActiveId((prev: string | null) => prev ?? fromQuery ?? (list[0]?.id ?? null));
       setLoading(false);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadDigests]);
 
   useEffect(() => {
@@ -124,7 +129,7 @@ const DigestsPage = () => {
         </div>
       )}
       {active && (
-        <div className="flex flex-row items-center space-x-4 mt-4">
+        <div className="flex flex-row items-center space-x-4 mt-4 mb-6">
           <p>{`${active.frequency === 'weekly' ? 'Weekly' : 'Daily'} at ${active.timeOfDay}`}</p>
           <button onClick={() => toggleEnabled(active)} className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[#24A0ED] text-white hover:bg-[#1a8fd4] transition">
             {active.enabled ? 'Enabled' : 'Disabled'}

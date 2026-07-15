@@ -28,10 +28,12 @@ export const formatTimeDifference = (
 
 export const formatTimestamp = (
   date: Date | string,
+  locale?: string,
+  timeZone?: string,
 ): string => {
   const d = new Date(date);
   if (isNaN(d.getTime())) return 'Invalid date';
-  return d.toLocaleString('en-US', {
+  return d.toLocaleString(locale ?? 'en-US', {
     weekday: 'short',
     year: 'numeric',
     month: 'short',
@@ -40,5 +42,6 @@ export const formatTimestamp = (
     minute: '2-digit',
     second: '2-digit',
     timeZoneName: 'short',
+    timeZone: timeZone ?? 'UTC',
   });
 };

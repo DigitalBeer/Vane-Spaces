@@ -58,7 +58,7 @@ const DigestsPage = () => {
       return;
     }
     setPage(1);
-    loadEntries(activeId, 1, false).catch(() => setEntries([]));
+    loadEntries(activeId, 1, false).catch(() => { if (activeIdRef.current === activeId) setEntries([]); });
   }, [activeId]);
 
   const active: DigestTopic | undefined = digests.find((d: DigestTopic) => d.id === activeId);
@@ -91,6 +91,8 @@ const DigestsPage = () => {
     setLoadingMore(true);
     try {
       await loadEntries(activeId, page + 1, true);
+    } catch {
+      /* leave existing entries as-is */
     } finally {
       setLoadingMore(false);
     }

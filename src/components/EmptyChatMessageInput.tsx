@@ -1,5 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import TextareaAutosize from 'react-textarea-autosize';
 import Sources from './MessageInputActions/Sources';
 import Optimization from './MessageInputActions/Optimization';
@@ -9,9 +10,10 @@ import ModelSelector from './MessageInputActions/ChatModelSelector';
 
 const EmptyChatMessageInput = () => {
   const { sendMessage } = useChat();
+  const searchParams = useSearchParams();
 
   /* const [copilotEnabled, setCopilotEnabled] = useState(false); */
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(searchParams.get('q') ?? '');
 
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 

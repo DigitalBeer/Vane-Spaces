@@ -1,8 +1,11 @@
 import db from '@/lib/db';
 import { digestTopics } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+  const rl = checkRateLimit(req);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterSeconds!);
   try {
     const { id } = await params;
     const body = await req.json();

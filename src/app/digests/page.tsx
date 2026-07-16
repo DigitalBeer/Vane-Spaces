@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Newspaper, Plus, Trash2, X } from 'lucide-react';
+import { Loader2, Newspaper, Plus, Trash2, X } from 'lucide-react';
 import CreateDigestModal from '@/components/CreateDigestModal';
 
 type DigestTopic = { id: string; name: string; enabled: boolean; frequency: 'daily' | 'weekly'; timeOfDay: string; dayOfWeek: number | null; nextRunAt: string; lastRunAt: string | null; lastRunError: string | null };
@@ -15,7 +15,24 @@ const DigestsPage = () => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [entries, setEntries] = useState<DigestEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const activeIdRef = useRef<string | null>(null);
+
+  const loadEntries = async (digestId: string, pageNum: number, append: boolean): Promise<void> => {
+    const res = await fetch(`/api/digests/${digestId}/entries?page=${pageNum}&limit=20`);
+    const data: { entries?: DigestEntry[]; hasMore?: boolean } = await res.json();
+    if (activeIdRef.current !== digestId) return;
+    if (append) {
+      setEntries((prev) => [...prev, ...(data.entries ?? [])]);
+    } else {
+      setEntries(data.entries ?? []);
+    }
+    setHasMore(data.hasMore ?? false);
+    setPage(pageNum);
+  };
 
   const loadDigests = useCallback(async (): Promise<DigestTopic[]> => {
     const res = await fetch('/api/digests');
@@ -33,11 +50,15 @@ const DigestsPage = () => {
   }, [loadDigests]);
 
   useEffect(() => {
-    if (!activeId) { setEntries([]); return; }
-    fetch(`/api/digests/${activeId}/entries`)
-      .then((r: Response) => r.json())
-      .then((data: { entries?: DigestEntry[] }) => setEntries(data.entries ?? []))
-      .catch(() => setEntries([]));
+    activeIdRef.current = activeId;
+    if (!activeId) {
+      setEntries([]);
+      setHasMore(false);
+      setPage(1);
+      return;
+    }
+    setPage(1);
+    loadEntries(activeId, 1, false).catch(() => setEntries([]));
   }, [activeId]);
 
   const active: DigestTopic | undefined = digests.find((d: DigestTopic) => d.id === activeId);
@@ -63,6 +84,16 @@ const DigestsPage = () => {
   const onCreated = async (): Promise<void> => {
     const list = await loadDigests();
     setActiveId(list[list.length - 1]?.id ?? null);
+  };
+
+  const loadMore = async (): Promise<void> => {
+    if (!activeId || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      await loadEntries(activeId, page + 1, true);
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   const domainOf = (url: string): string => {
@@ -136,6 +167,18 @@ const DigestsPage = () => {
               )}
             </div>
           ))}
+          {hasMore && !loading && (
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-[#24A0ED] text-white text-sm hover:bg-[#1a8fd4] disabled:opacity-50 transition"
+            >
+              {loadingMore ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : null}
+              Load more
+            </button>
+          )}
         </div>
       )}
       {showCreate && <CreateDigestModal onClose={() => setShowCreate(false)} onCreated={onCreated} />}

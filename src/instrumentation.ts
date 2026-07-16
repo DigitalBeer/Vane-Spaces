@@ -9,5 +9,12 @@ export const register = async () => {
     }
 
     await import('./lib/config/index');
+
+    try {
+      const { startDigestPoller } = await import('./lib/digests/poller');
+      startDigestPoller();
+    } catch (error) {
+      console.error('Failed to start digest poller:', error);
+    }
   }
 };

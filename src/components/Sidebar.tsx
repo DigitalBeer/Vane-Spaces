@@ -10,6 +10,7 @@ import {
   Settings,
   Plus,
   ArrowLeft,
+  Newspaper,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSelectedLayoutSegments } from 'next/navigation';
@@ -49,6 +50,12 @@ const Sidebar = ({ children }: { children: React.ReactNode }) => {
       href: '/discover',
       active: segments.includes('discover'),
       label: 'Discover',
+    },
+    {
+      icon: Newspaper,
+      href: '/digests',
+      active: segments.includes('digests'),
+      label: 'Digests',
     },
     {
       icon: BookOpenText,

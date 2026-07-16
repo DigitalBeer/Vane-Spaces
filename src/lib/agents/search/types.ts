@@ -13,6 +13,7 @@ export type SearchAgentConfig = {
   embedding: BaseEmbedding<any>;
   mode: 'speed' | 'balanced' | 'quality';
   systemInstructions: string;
+  excludedDomains?: string[];
 };
 
 export type SearchAgentInput = {
@@ -66,6 +67,7 @@ export type AdditionalConfig = {
   llm: BaseLLM<any>;
   embedding: BaseEmbedding<any>;
   session: SessionManager;
+  excludedDomains?: string[];
 };
 
 export type ResearcherInput = {

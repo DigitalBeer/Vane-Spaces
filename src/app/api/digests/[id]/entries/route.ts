@@ -2,6 +2,7 @@ import db from '@/lib/db';
 import { chats, messages } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { Block, Chunk } from '@/lib/types';
+import { truncateSnippet } from '@/lib/utils';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 type EntrySource = { title: string; url: string };
@@ -21,7 +22,7 @@ function makeSnippet(text: string): string {
     .replace(/[#*`>_~]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-  return cleaned.length > 280 ? cleaned.slice(0, 280).trimEnd() + '…' : cleaned;
+  return truncateSnippet(cleaned, 280);
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {

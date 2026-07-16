@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cn, formatTimeDifference, formatTimestamp } from './utils';
+import { cn, formatTimeDifference, formatTimestamp, truncateSnippet } from './utils';
 
 describe('cn', () => {
   it('joins truthy class values', () => {
@@ -64,5 +64,34 @@ describe('formatTimestamp', () => {
     expect(formatTimestamp(date, 'en-US', 'America/New_York')).toBe(
       'Sun, Jul 12, 2026, 10:30:00 AM EDT',
     );
+  });
+});
+
+describe('truncateSnippet', () => {
+  it('returns text unchanged when under maxLength', () => {
+    expect(truncateSnippet('Hello world', 280)).toBe('Hello world');
+  });
+
+  it('returns text unchanged when exactly maxLength', () => {
+    const text = 'x'.repeat(100);
+    expect(truncateSnippet(text, 100)).toBe(text);
+  });
+
+  it('truncates text exceeding maxLength with ellipsis', () => {
+    const text = 'a'.repeat(300);
+    expect(truncateSnippet(text, 280)).toBe('a'.repeat(280) + '…');
+  });
+
+  it('trims trailing whitespace before appending ellipsis', () => {
+    const text = 'Hello ' + 'x'.repeat(276);
+    expect(truncateSnippet(text, 280)).toBe('Hello ' + 'x'.repeat(274) + '…');
+  });
+
+  it('handles empty string', () => {
+    expect(truncateSnippet('', 100)).toBe('');
+  });
+
+  it('handles maxLength of 0', () => {
+    expect(truncateSnippet('anything', 0)).toBe('…');
   });
 });

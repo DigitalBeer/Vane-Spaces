@@ -25,3 +25,23 @@ export const formatTimeDifference = (
   else
     return `${Math.floor(diffInSeconds / 31536000)} year${Math.floor(diffInSeconds / 31536000) !== 1 ? 's' : ''}`;
 };
+
+export const formatTimestamp = (
+  date: Date | string,
+  locale?: string,
+  timeZone?: string,
+): string => {
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'Invalid date';
+  return d.toLocaleString(locale ?? 'en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short',
+    timeZone: timeZone ?? 'UTC',
+  });
+};

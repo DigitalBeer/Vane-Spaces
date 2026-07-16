@@ -1,6 +1,6 @@
 import db from '@/lib/db';
 import { chats, messages } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { Block, Chunk } from '@/lib/types';
 import { truncateSnippet } from '@/lib/utils';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
@@ -30,10 +30,33 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!rl.allowed) return rateLimitResponse(rl.retryAfterSeconds!);
   try {
     const { id } = await params;
-    const entryChats = await db.query.chats.findMany({
-      where: eq(chats.digestId, id),
-      orderBy: (c, { desc }) => [desc(c.createdAt)],
-    });
+    const { searchParams } = new URL(req.url);
+    const rawPage = searchParams.get('page');
+    const rawLimit = searchParams.get('limit');
+
+    const page =
+      rawPage && !isNaN(Number(rawPage)) && Number(rawPage) >= 1
+        ? Number(rawPage)
+        : 1;
+    const limit =
+      rawLimit && !isNaN(Number(rawLimit)) && Number(rawLimit) >= 1
+        ? Math.min(Number(rawLimit), 50)
+        : 20;
+    const offset = (page - 1) * limit;
+
+    const [entryChats, total] = await Promise.all([
+      db.query.chats.findMany({
+        where: eq(chats.digestId, id),
+        orderBy: (c, { desc }) => [desc(c.createdAt)],
+        limit,
+        offset,
+      }),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(chats)
+        .where(eq(chats.digestId, id))
+        .then((r) => r[0]?.count ?? 0),
+    ]);
 
     const entries: DigestEntry[] = [];
     for (const entry of entryChats) {
@@ -74,7 +97,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       });
     }
 
-    return Response.json({ entries }, { status: 200 });
+    return Response.json(
+      { entries, page, limit, total, hasMore: page * limit < total },
+      { status: 200 },
+    );
   } catch (err) {
     console.error('Error fetching digest entries:', err);
     return Response.json({ message: 'An error has occurred.' }, { status: 500 });

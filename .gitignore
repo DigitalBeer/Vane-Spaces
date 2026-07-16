@@ -51,4 +51,7 @@ tsconfig.tsbuildinfo
 # Claude Code local config / runtime files
 .claude/
 .pi-orchestrator/
-.pi/npm/
+# pi editor per-repo config — pi-orchestrator regenerates .pi/*.json
+# idempotently at the start of every run, so nothing here needs committing
+# (the earlier .pi/npm/-only ignore still left .pi/*.json as untracked debris).
+.pi/

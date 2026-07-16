@@ -2,8 +2,11 @@ import db from '@/lib/db';
 import { digestTopics } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { computeNextRunAt } from '@/lib/digests/schedule';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+  const rl = checkRateLimit(req);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterSeconds!);
   try {
     const { id } = await params;
     const digest = await db.query.digestTopics.findFirst({ where: eq(digestTopics.id, id) });
@@ -16,6 +19,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+  const rl = checkRateLimit(req);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterSeconds!);
   try {
     const { id } = await params;
     const body = await req.json();
@@ -65,6 +70,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+  const rl = checkRateLimit(req);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterSeconds!);
   try {
     const { id } = await params;
     const existing = await db.query.digestTopics.findFirst({ where: eq(digestTopics.id, id) });

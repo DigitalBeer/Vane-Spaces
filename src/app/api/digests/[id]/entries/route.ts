@@ -2,6 +2,7 @@ import db from '@/lib/db';
 import { chats, messages } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { Block, Chunk } from '@/lib/types';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 type EntrySource = { title: string; url: string };
 type DigestEntry = {
@@ -24,6 +25,8 @@ function makeSnippet(text: string): string {
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+  const rl = checkRateLimit(req);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterSeconds!);
   try {
     const { id } = await params;
     const entryChats = await db.query.chats.findMany({

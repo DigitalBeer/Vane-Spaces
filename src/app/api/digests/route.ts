@@ -3,8 +3,11 @@ import { digestTopics } from '@/lib/db/schema';
 import ModelRegistry from '@/lib/models/registry';
 import { computeNextRunAt } from '@/lib/digests/schedule';
 import crypto from 'crypto';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
-export const GET = async (): Promise<Response> => {
+export const GET = async (req: Request): Promise<Response> => {
+  const rl = checkRateLimit(req);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterSeconds!);
   try {
     const digests = await db.query.digestTopics.findMany({
       orderBy: (t, { desc }) => [desc(t.createdAt)],
@@ -17,6 +20,8 @@ export const GET = async (): Promise<Response> => {
 };
 
 export const POST = async (req: Request): Promise<Response> => {
+  const rl = checkRateLimit(req);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterSeconds!);
   try {
     const body = await req.json();
     const name: string = typeof body.name === 'string' ? body.name.trim() : '';

@@ -34,14 +34,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const rawPage = searchParams.get('page');
     const rawLimit = searchParams.get('limit');
 
-    const page =
-      rawPage && !isNaN(Number(rawPage)) && Number(rawPage) >= 1
-        ? Number(rawPage)
-        : 1;
+    const p = Number(rawPage);
+    const page = rawPage && Number.isInteger(p) && p >= 1 ? p : 1;
+    const l = Number(rawLimit);
     const limit =
-      rawLimit && !isNaN(Number(rawLimit)) && Number(rawLimit) >= 1
-        ? Math.min(Number(rawLimit), 50)
-        : 20;
+      rawLimit && Number.isInteger(l) && l >= 1 ? Math.min(l, 50) : 20;
     const offset = (page - 1) * limit;
 
     const [entryChats, total] = await Promise.all([

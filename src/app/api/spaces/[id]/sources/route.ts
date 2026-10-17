@@ -1,4 +1,4 @@
-import db from '@/lib/db';
+import db, { sqlite as rawDb } from '@/lib/db';
 import { spaces } from '@/lib/db/schema';
 import { SpaceWebSource } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -6,12 +6,9 @@ import ModelRegistry from '@/lib/models/registry';
 import UploadManager from '@/lib/uploads/manager';
 import Scraper from '@/lib/scraper';
 import { splitText } from '@/lib/utils/splitText';
-import Database from 'better-sqlite3';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
-
-const rawDb = new Database(path.join(process.cwd(), './data/db.sqlite'));
 
 const BACKGROUND_TASK_TIMEOUT_MS = 60_000;
 

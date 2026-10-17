@@ -31,7 +31,7 @@ type FileRes = {
 
 class UploadManager {
     private embeddingModel: BaseEmbedding<any>;
-    static uploadsDir = path.join(process.cwd(), 'data', 'uploads');
+    static uploadsDir = path.join(process.env.DATA_DIR || process.cwd(), 'data', 'uploads');
     static uploadedFilesRecordPath = path.join(this.uploadsDir, 'uploaded_files.json');
 
     constructor(private params: UploadManagerParams) {

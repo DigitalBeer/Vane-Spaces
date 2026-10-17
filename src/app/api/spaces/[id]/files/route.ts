@@ -1,12 +1,8 @@
-import db from '@/lib/db';
+import db, { sqlite as rawDb } from '@/lib/db';
 import { spaces } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import ModelRegistry from '@/lib/models/registry';
 import UploadManager from '@/lib/uploads/manager';
-import Database from 'better-sqlite3';
-import path from 'path';
-
-const rawDb = new Database(path.join(process.cwd(), './data/db.sqlite'));
 
 export const POST = async (
   req: Request,

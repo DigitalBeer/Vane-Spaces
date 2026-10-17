@@ -9,6 +9,7 @@ import db from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { chats, spaces } from '@/lib/db/schema';
 import UploadManager from '@/lib/uploads/manager';
+import { resolveSpaceContext } from '@/lib/spaceContext';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -213,42 +214,26 @@ export const POST = async (req: Request) => {
       }
     });
 
-    let resolvedInstructions = body.systemInstructions || 'None';
-    let resolvedSources: SearchSources[] = body.sources as SearchSources[];
-    let resolvedFileIds: string[] = [...body.files];
-
+    let space = null;
     if (body.spaceId) {
       try {
-        const space = await db.query.spaces.findFirst({
+        space = await db.query.spaces.findFirst({
           where: eq(spaces.id, body.spaceId),
         });
-        if (space) {
-          if (space.instructions) {
-            const globalPart =
-              space.useGlobalInstructions && resolvedInstructions !== 'None'
-                ? resolvedInstructions + '\n\n'
-                : '';
-            resolvedInstructions = `${globalPart}[Space: ${space.name}]\n${space.instructions}`;
-          }
-
-          const scope = space.defaultSourceScope;
-          const spaceFileIds = [
-            ...(space.files ?? []).map((f) => f.fileId),
-            ...(space.webSources ?? [])
-              .filter((s) => s.status === 'ready' && s.fileId)
-              .map((s) => s.fileId as string),
-          ];
-
-          if (scope === 'space') {
-            resolvedFileIds = [...resolvedFileIds, ...spaceFileIds];
-          } else if (scope === 'both') {
-            resolvedFileIds = [...resolvedFileIds, ...spaceFileIds];
-          }
-        }
       } catch (err) {
         console.error('Failed to load space data:', err);
       }
     }
+
+    const {
+      sources: resolvedSources,
+      fileIds: resolvedFileIds,
+      systemInstructions: resolvedInstructions,
+    } = resolveSpaceContext(space, {
+      sources: body.sources as SearchSources[],
+      fileIds: [...body.files],
+      systemInstructions: body.systemInstructions || 'None',
+    });
 
     agent.searchAsync(session, {
       chatHistory: history,

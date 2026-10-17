@@ -5,30 +5,22 @@ import ModelRegistry from '@/lib/models/registry';
 import SessionManager from '@/lib/session';
 import SearchAgent from '@/lib/agents/search';
 import { computeNextRunAt } from './schedule';
-import { SearchSources } from '@/lib/agents/search/types';
+import { resolveSpaceContext } from '@/lib/spaceContext';
 
 type DigestTopicRow = typeof digestTopics.$inferSelect;
 
 export async function runDigest(topic: DigestTopicRow): Promise<void> {
   const nowIso = (): string => new Date().toISOString();
-  let systemInstructions = 'None';
-  let fileIds: string[] = [];
-  const sources: SearchSources[] = topic.sources ?? [];
-  if (topic.spaceId) {
-    const space = await db.query.spaces.findFirst({ where: eq(spaces.id, topic.spaceId) });
-    if (space) {
-      if (space.instructions) systemInstructions = `[Space: ${space.name}]\n${space.instructions}`;
-      const spaceFileIds: string[] = [
-        ...(space.files ?? []).map((f: { fileId: string; name: string }) => f.fileId),
-        ...(space.webSources ?? [])
-          .filter((s: { status: string; fileId: string | null }) => s.status === 'ready' && s.fileId)
-          .map((s: { fileId: string | null }) => s.fileId as string),
-      ];
-      if (space.defaultSourceScope === 'space' || space.defaultSourceScope === 'both') {
-        fileIds = [...fileIds, ...spaceFileIds];
-      }
-    }
-  }
+  const space = topic.spaceId
+    ? await db.query.spaces.findFirst({ where: eq(spaces.id, topic.spaceId) })
+    : null;
+  const ctx = resolveSpaceContext(space, {
+    sources: topic.sources ?? [],
+    fileIds: [],
+    systemInstructions: 'None',
+  });
+  const { sources, fileIds } = ctx;
+  let systemInstructions = ctx.systemInstructions;
   if (topic.instructions) systemInstructions = systemInstructions === 'None' ? topic.instructions : `${systemInstructions}\n\n${topic.instructions}`;
 
   const schedule = { frequency: topic.frequency, timeOfDay: topic.timeOfDay, dayOfWeek: topic.dayOfWeek };

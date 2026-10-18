@@ -17,11 +17,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
-  try {
-    fs.rmSync(dataDir, { recursive: true, force: true });
-  } catch {
-    // migrate.ts keeps its DB handle open; Windows then refuses the delete.
-  }
+  fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
 const writeMigration = (name: string, sql: string) =>

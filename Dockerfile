@@ -34,7 +34,11 @@ COPY drizzle ./drizzle
 
 RUN mkdir /home/vane/uploads
 
-RUN yarn add playwright
+# Install the locked production deps (incl. playwright). A bare `yarn add` here
+# has no lockfile and re-resolves everything, e.g. pulling a newer Next.js
+# than the one the standalone build was compiled with.
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile --production --network-timeout 600000
 RUN yarn playwright install --with-deps --only-shell chromium
 
 RUN useradd --shell /bin/bash --system \

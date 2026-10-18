@@ -6,7 +6,7 @@ import { getWriterPrompt } from '@/lib/prompts/search/writer';
 import { WidgetExecutor } from './widgets';
 import db from '@/lib/db';
 import { messages } from '@/lib/db/schema';
-import { indexMessageFts } from '@/lib/db/messagesFts';
+import { deleteMessagesFts, indexMessageFts } from '@/lib/db/messagesFts';
 import { and, eq, gt } from 'drizzle-orm';
 import { TextBlock } from '@/lib/types';
 import { getTokenCount } from '@/lib/utils/splitText';
@@ -31,12 +31,13 @@ class SearchAgent {
         responseBlocks: [],
       });
     } else {
-      await db
+      const removed = await db
         .delete(messages)
         .where(
           and(eq(messages.chatId, input.chatId), gt(messages.id, exists.id)),
         )
-        .execute();
+        .returning({ messageId: messages.messageId });
+      deleteMessagesFts(removed.map((m) => m.messageId));
       await db
         .update(messages)
         .set({

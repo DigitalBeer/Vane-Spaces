@@ -51,7 +51,9 @@ fs.readdirSync(migrationsFolder)
       return;
     }
 
-    try {
+    // Each migration and its ran_migrations record commit together, so a
+    // failure part-way through rolls back instead of leaving a half-migrated DB.
+    const applyMigration = db.transaction(() => {
       if (migrationName === '0001') {
         const messages = db
           .prepare(
@@ -320,6 +322,10 @@ fs.readdirSync(migrationsFolder)
       db.prepare('INSERT OR IGNORE INTO ran_migrations (name) VALUES (?)').run(
         migrationName,
       );
+    });
+
+    try {
+      applyMigration();
       console.log(`Applied migration: ${file}`);
     } catch (err) {
       console.error(`Failed to apply migration ${file}:`, err);

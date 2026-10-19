@@ -64,6 +64,19 @@ export const indexMessageFts = (message: {
   }
 };
 
+export const deleteMessagesFts = (messageIds: string[]) => {
+  if (messageIds.length === 0) return;
+  try {
+    ensureTable();
+    const del = sqlite.prepare('DELETE FROM messages_fts WHERE messageId = ?');
+    sqlite.transaction((ids: string[]) => ids.forEach((id) => del.run(id)))(
+      messageIds,
+    );
+  } catch (err) {
+    console.error('Failed to delete messages from FTS:', err);
+  }
+};
+
 export const deleteChatFts = (chatId: string) => {
   try {
     ensureTable();

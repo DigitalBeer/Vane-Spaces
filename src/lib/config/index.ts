@@ -3,6 +3,7 @@ import fs from 'fs';
 import { Config, ConfigModelProvider, UIConfigSections } from './types';
 import { hashObj } from '../utils/hash';
 import { getModelProvidersUIConfigSection } from '../models/providers';
+import { readJsonWithRecovery, writeJsonAtomic } from './safeFile';
 
 class ConfigManager {
   configPath: string = path.join(
@@ -146,44 +147,21 @@ class ConfigManager {
   }
 
   private saveConfig() {
-    fs.writeFileSync(
-      this.configPath,
-      JSON.stringify(this.currentConfig, null, 2),
-    );
+    // Atomic, so another process can never read a half-written file (which
+    // used to be "repaired" with defaults, wiping providers and API keys).
+    writeJsonAtomic(this.configPath, this.currentConfig);
   }
 
   private initializeConfig() {
     const exists = fs.existsSync(this.configPath);
     if (!exists) {
-      fs.writeFileSync(
-        this.configPath,
-        JSON.stringify(this.currentConfig, null, 2),
-      );
+      this.saveConfig();
     } else {
-      try {
-        this.currentConfig = JSON.parse(
-          fs.readFileSync(this.configPath, 'utf-8'),
-        );
-      } catch (err) {
-        if (err instanceof SyntaxError) {
-          console.error(
-            `Error parsing config file at ${this.configPath}:`,
-            err,
-          );
-          console.log(
-            'Loading default config and overwriting the existing file.',
-          );
-          fs.writeFileSync(
-            this.configPath,
-            JSON.stringify(this.currentConfig, null, 2),
-          );
-          return;
-        } else {
-          console.log('Unknown error reading config file:', err);
-        }
-      }
-
-      this.currentConfig = this.migrateConfig(this.currentConfig);
+      // An unreadable file is never overwritten with defaults: it is kept as
+      // config.json.corrupt-<time> and the last good backup is restored.
+      this.currentConfig = this.migrateConfig(
+        readJsonWithRecovery(this.configPath, this.currentConfig).data,
+      );
     }
   }
 
@@ -193,6 +171,8 @@ class ConfigManager {
   }
 
   private initializeFromEnv() {
+    const before = JSON.stringify(this.currentConfig);
+
     /* providers section*/
     const providerConfigSections = getModelProvidersUIConfigSection();
 
@@ -254,7 +234,10 @@ class ConfigManager {
       }
     });
 
-    this.saveConfig();
+    // Only write when env vars actually changed something: every process
+    // (and every build worker) runs this at startup, and needless rewrites
+    // are exactly when concurrent writers used to collide.
+    if (JSON.stringify(this.currentConfig) !== before) this.saveConfig();
   }
 
   public getConfig(key: string, defaultValue?: any): any {

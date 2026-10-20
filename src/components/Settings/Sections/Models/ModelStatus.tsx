@@ -9,6 +9,8 @@ type FreeModelVerdict = {
   modelKey: string;
   status: 'withdrawn' | 'no-longer-free';
   replacement?: string;
+  /** Added to the connection by hand (false: only selected from the live free list). */
+  configured?: boolean;
 };
 
 type BenchedModel = {
@@ -26,7 +28,25 @@ const BENCH_REASON: Record<BenchedModel['errorClass'], string> = {
   auth: 'API key rejected',
 };
 
-const SAVED_MODEL_PREFIXES = ['chatModel', 'discoverChatModel', 'fallbackChatModel'];
+const SAVED_MODELS = [
+  { prefix: 'chatModel', label: 'chat model' },
+  { prefix: 'discoverChatModel', label: 'Discover model' },
+  { prefix: 'fallbackChatModel', label: 'fallback model' },
+];
+
+const selectedModels = () =>
+  SAVED_MODELS.map(({ prefix }) => ({
+    providerId: localStorage.getItem(`${prefix}ProviderId`) ?? '',
+    key: localStorage.getItem(`${prefix}Key`) ?? '',
+  })).filter((m) => m.providerId && m.key);
+
+/** Which pickers currently use this model, e.g. ["Discover model"]. */
+const usedAs = (providerId: string, key: string) =>
+  SAVED_MODELS.filter(
+    ({ prefix }) =>
+      localStorage.getItem(`${prefix}ProviderId`) === providerId &&
+      localStorage.getItem(`${prefix}Key`) === key,
+  ).map(({ label }) => label);
 
 /**
  * Free OpenRouter models that are no longer free (with a one-click switch to
@@ -44,7 +64,11 @@ const ModelStatus = ({
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/models/status');
+      const res = await fetch('/api/models/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selected: selectedModels() }),
+      });
       if (!res.ok) return;
       const data = await res.json();
       setFreeModels(data.freeModels ?? []);
@@ -62,21 +86,39 @@ const ModelStatus = ({
     if (!v.replacement) return;
     setBusy(v.modelKey);
     try {
-      const add = await fetch(`/api/providers/${v.providerId}/models`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'chat', key: v.replacement, name: v.replacement }),
-      });
-      if (!add.ok) throw new Error('add failed');
-      const remove = await fetch(`/api/providers/${v.providerId}/models`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'chat', key: v.modelKey }),
-      });
-      if (!remove.ok) throw new Error('remove failed');
+      // A model added to the connection by hand is swapped there too; one
+      // picked from the live free list only needs the selection changed.
+      if (v.configured !== false) {
+        const add = await fetch(`/api/providers/${v.providerId}/models`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'chat', key: v.replacement, name: v.replacement }),
+        });
+        if (!add.ok) throw new Error('add failed');
+        const remove = await fetch(`/api/providers/${v.providerId}/models`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'chat', key: v.modelKey }),
+        });
+        if (!remove.ok) throw new Error('remove failed');
+
+        setProviders((prev) =>
+          prev.map((p) =>
+            p.id === v.providerId
+              ? {
+                  ...p,
+                  chatModels: [
+                    ...p.chatModels.filter((m) => m.key !== v.modelKey),
+                    { key: v.replacement!, name: v.replacement! },
+                  ],
+                }
+              : p,
+          ),
+        );
+      }
 
       // Point any saved selection at the replacement.
-      for (const prefix of SAVED_MODEL_PREFIXES) {
+      for (const { prefix } of SAVED_MODELS) {
         if (
           localStorage.getItem(`${prefix}ProviderId`) === v.providerId &&
           localStorage.getItem(`${prefix}Key`) === v.modelKey
@@ -85,20 +127,7 @@ const ModelStatus = ({
         }
       }
 
-      setProviders((prev) =>
-        prev.map((p) =>
-          p.id === v.providerId
-            ? {
-                ...p,
-                chatModels: [
-                  ...p.chatModels.filter((m) => m.key !== v.modelKey),
-                  { key: v.replacement!, name: v.replacement! },
-                ],
-              }
-            : p,
-        ),
-      );
-      toast.success(`Switched to ${v.replacement}.`);
+      toast.success(`Switched to ${v.replacement}. Reopen Settings to see it in the pickers.`);
       await load();
     } catch {
       toast.error('Could not switch model.');
@@ -130,8 +159,13 @@ const ModelStatus = ({
           <div className="flex items-start gap-2 min-w-0">
             <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
             <p className="text-xs text-black/80 dark:text-white/80 break-words">
+              {(() => {
+                const uses = usedAs(v.providerId, v.modelKey);
+                return uses.length > 0 ? `Your ${uses.join(' and ')} ` : '';
+              })()}
               <span className="font-medium">{v.providerName} · {v.modelKey}</span>{' '}
-              {v.status === 'withdrawn' ? 'is no longer offered.' : 'is no longer free.'}
+              {v.status === 'withdrawn' ? 'is no longer offered' : 'is no longer free'}
+              {usedAs(v.providerId, v.modelKey).length > 0 ? '; the fallback model is used meanwhile.' : '.'}
               {!v.replacement && ' No free replacement from the same vendor was found.'}
             </p>
           </div>

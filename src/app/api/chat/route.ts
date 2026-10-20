@@ -47,6 +47,7 @@ const bodySchema = z.object({
   embeddingModel: embeddingModelSchema,
   systemInstructions: z.string().nullable().optional().default(''),
   spaceId: z.string().nullable().optional().default(null),
+  lightweight: z.boolean().optional().default(false),
 });
 
 type Body = z.infer<typeof bodySchema>;
@@ -247,6 +248,7 @@ export const POST = async (req: Request) => {
         mode: body.optimizationMode,
         fileIds: resolvedFileIds,
         systemInstructions: resolvedInstructions,
+        lightweight: body.lightweight,
       },
     });
 

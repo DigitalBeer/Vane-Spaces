@@ -87,6 +87,26 @@ class ConfigManager {
         default: true,
         scope: 'client',
       },
+      {
+        name: 'Follow-up suggestions',
+        key: 'showSuggestions',
+        type: 'switch',
+        required: false,
+        description:
+          'Suggest related questions after each answer. Each set costs one extra model call, which is slow on CPU-only models.',
+        default: true,
+        scope: 'client',
+      },
+      {
+        name: 'Lightweight page reading',
+        key: 'lightweightResearch',
+        type: 'switch',
+        required: false,
+        description:
+          'For slow local models: read only the opening part of long web pages instead of summarising them section by section. Much faster on CPU, may miss details further down a page.',
+        default: false,
+        scope: 'client',
+      },
     ],
     personalization: [
       {

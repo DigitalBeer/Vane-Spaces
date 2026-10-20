@@ -15,7 +15,11 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { getSuggestions } from '../actions';
 import { MinimalProvider } from '../models/types';
-import { getAutoMediaSearch } from '../config/clientRegistry';
+import {
+  getAutoMediaSearch,
+  getLightweightResearch,
+  getShowSuggestions,
+} from '../config/clientRegistry';
 import { applyPatch } from 'rfc6902';
 import { Widget } from '@/components/ChatWindow';
 
@@ -806,7 +810,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           (block) => block.type === 'suggestion',
         );
 
-        if (hasSourceBlocks && !hasSuggestions) {
+        if (hasSourceBlocks && !hasSuggestions && getShowSuggestions()) {
           const suggestions = await getSuggestions(newHistory);
           const suggestionBlock: Block = {
             id: crypto.randomBytes(7).toString('hex'),
@@ -899,6 +903,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           },
           systemInstructions: localStorage.getItem('systemInstructions'),
           spaceId: spaceIdRef.current,
+          lightweight: getLightweightResearch(),
         }),
         signal: abortController.signal,
       });

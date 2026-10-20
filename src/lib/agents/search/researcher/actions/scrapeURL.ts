@@ -3,6 +3,7 @@ import { ResearchAction } from '../../types';
 import { Chunk, ReadingResearchBlock } from '@/lib/types';
 import Scraper from '@/lib/scraper';
 import { splitText } from '@/lib/utils/splitText';
+import { lightweightExcerpt } from './lightweight';
 
 const extractorPrompt = `
                   Assistant is an AI information extractor. Assistant will be shared with scraped information from a website along with the queries used to retrieve that information. Assistant's task is to extract relevant facts from the scraped data to answer the queries.
@@ -148,7 +149,9 @@ const scrapeURLAction: ResearchAction<typeof schema> = {
 
           let accumulatedContent = '';
 
-          if (chunks.length > 1) {
+          if (chunks.length > 1 && additionalConfig.lightweight) {
+            accumulatedContent = lightweightExcerpt(scraped.content);
+          } else if (chunks.length > 1) {
             try {
               await Promise.all(
                 chunks.map(async (chunk) => {

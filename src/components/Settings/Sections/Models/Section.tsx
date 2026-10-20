@@ -7,6 +7,8 @@ import {
 } from '@/lib/config/types';
 import ModelProvider from './ModelProvider';
 import ModelSelect from './ModelSelect';
+import ModelStatus from './ModelStatus';
+import OptionalModelSelect from './OptionalModelSelect';
 
 const Models = ({
   fields,
@@ -16,10 +18,14 @@ const Models = ({
   values: ConfigModelProvider[];
 }) => {
   const [providers, setProviders] = useState<ConfigModelProvider[]>(values);
+  const chatProviders = providers.filter((p) =>
+    p.chatModels.some((m) => m.key != 'error'),
+  );
 
   return (
     <div className="flex-1 space-y-6 overflow-y-auto py-6">
       <div className="flex flex-col px-6 gap-y-4">
+        <ModelStatus setProviders={setProviders} />
         <h3 className="text-xs lg:text-xs text-black/70 dark:text-white/70">
           Select models
         </h3>
@@ -35,6 +41,8 @@ const Models = ({
           )}
           type="embedding"
         />
+        <OptionalModelSelect providers={chatProviders} type="discover" />
+        <OptionalModelSelect providers={chatProviders} type="fallback" />
       </div>
       <div className="border-t border-light-200 dark:border-dark-200" />
       <div className="flex flex-row justify-between items-center px-6 ">

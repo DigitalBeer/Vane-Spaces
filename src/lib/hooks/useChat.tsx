@@ -17,9 +17,12 @@ import { getSuggestions } from '../actions';
 import { MinimalProvider } from '../models/types';
 import {
   getAutoMediaSearch,
+  getDiscoverChatModel,
+  getFallbackChatModel,
   getLightweightResearch,
   getShowSuggestions,
 } from '../config/clientRegistry';
+import { ChatOrigin, pickChatModel } from '../models/pickChatModel';
 import { applyPatch } from 'rfc6902';
 import { Widget } from '@/components/ChatWindow';
 
@@ -206,6 +209,7 @@ const loadMessages = async (
   setSpaceId: (spaceId: string | null) => void,
   setSpaceInfo: (info: SpaceSummary | null) => void,
   setDigestInfo: (info: DigestSummary | null) => void,
+  setChatOrigin: (origin: ChatOrigin) => void,
 ) => {
   const res = await fetch(`/api/chats/${chatId}`, {
     method: 'GET',
@@ -274,6 +278,7 @@ const loadMessages = async (
   } else {
     setDigestInfo(null);
   }
+  setChatOrigin(data.chat.origin ?? 'user');
   setIsMessagesLoaded(true);
 };
 
@@ -327,6 +332,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [spaceInfo, setSpaceInfo] = useState<SpaceSummary | null>(null);
   const [digestInfo, setDigestInfo] = useState<DigestSummary | null>(null);
   const spaceIdRef = useRef<string | null>(spaceIdFromQuery);
+  // 'discover' when this thread was opened from a Discover article, so its
+  // messages (including follow-ups) use the Discover model.
+  const chatOriginRef = useRef<ChatOrigin>(
+    searchParams.get('origin') === 'discover' ? 'discover' : 'user',
+  );
   const [newChatCreated, setNewChatCreated] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -605,6 +615,9 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         setSpaceId,
         setSpaceInfo,
         setDigestInfo,
+        (origin) => {
+          chatOriginRef.current = origin;
+        },
       );
     } else if (!chatId) {
       setNewChatCreated(true);
@@ -811,7 +824,18 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         );
 
         if (hasSourceBlocks && !hasSuggestions && getShowSuggestions()) {
-          const suggestions = await getSuggestions(newHistory);
+          const suggestions = await getSuggestions(
+            newHistory,
+            pickChatModel({
+              origin: chatOriginRef.current,
+              chatModel: {
+                key: chatModelProvider.key,
+                providerId: chatModelProvider.providerId,
+              },
+              discoverModel: getDiscoverChatModel(),
+              fallbackModel: getFallbackChatModel(),
+            }),
+          );
           const suggestionBlock: Block = {
             id: crypto.randomBytes(7).toString('hex'),
             type: 'suggestion',
@@ -893,10 +917,16 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                 messageIndex === -1 ? undefined : messageIndex,
               )
             : chatHistory.current,
-          chatModel: {
-            key: chatModelProvider.key,
-            providerId: chatModelProvider.providerId,
-          },
+          ...pickChatModel({
+            origin: chatOriginRef.current,
+            chatModel: {
+              key: chatModelProvider.key,
+              providerId: chatModelProvider.providerId,
+            },
+            discoverModel: getDiscoverChatModel(),
+            fallbackModel: getFallbackChatModel(),
+          }),
+          origin: chatOriginRef.current === 'discover' ? 'discover' : 'user',
           embeddingModel: {
             key: embeddingModelProvider.key,
             providerId: embeddingModelProvider.providerId,

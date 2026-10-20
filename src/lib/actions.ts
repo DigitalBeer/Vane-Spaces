@@ -1,6 +1,13 @@
-export const getSuggestions = async (chatHistory: [string, string][]) => {
-  const chatModel = localStorage.getItem('chatModelKey');
-  const chatModelProvider = localStorage.getItem('chatModelProviderId');
+type ModelRef = { providerId: string; key: string };
+
+export const getSuggestions = async (
+  chatHistory: [string, string][],
+  models?: { chatModel: ModelRef; fallbackChatModel: ModelRef | null },
+) => {
+  const chatModel = models?.chatModel ?? {
+    providerId: localStorage.getItem('chatModelProviderId'),
+    key: localStorage.getItem('chatModelKey'),
+  };
 
   const res = await fetch(`/api/suggestions`, {
     method: 'POST',
@@ -9,10 +16,8 @@ export const getSuggestions = async (chatHistory: [string, string][]) => {
     },
     body: JSON.stringify({
       chatHistory,
-      chatModel: {
-        providerId: chatModelProvider,
-        key: chatModel,
-      },
+      chatModel,
+      fallbackChatModel: models?.fallbackChatModel ?? null,
     }),
   });
 

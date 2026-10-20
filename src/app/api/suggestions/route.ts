@@ -1,10 +1,12 @@
 import generateSuggestions from '@/lib/agents/suggestions';
 import ModelRegistry from '@/lib/models/registry';
 import { ModelWithProvider } from '@/lib/models/types';
+import { loadChatModelWithFallback } from '@/lib/models/loadWithFallback';
 
 interface SuggestionsGenerationBody {
   chatHistory: any[];
   chatModel: ModelWithProvider;
+  fallbackChatModel?: ModelWithProvider | null;
 }
 
 export const POST = async (req: Request) => {
@@ -13,9 +15,10 @@ export const POST = async (req: Request) => {
 
     const registry = new ModelRegistry();
 
-    const llm = await registry.loadChatModel(
-      body.chatModel.providerId,
-      body.chatModel.key,
+    const llm = await loadChatModelWithFallback(
+      registry,
+      body.chatModel,
+      body.fallbackChatModel,
     );
 
     const suggestions = await generateSuggestions(

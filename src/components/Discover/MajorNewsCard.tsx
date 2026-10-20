@@ -9,7 +9,7 @@ const MajorNewsCard = ({
   isLeft?: boolean;
 }) => (
   <Link
-    href={`/?q=${encodeURIComponent(`Summarize this article: ${item.url}`)}&title=${encodeURIComponent(item.title)}`}
+    href={`/?q=${encodeURIComponent(`Summarize this article: ${item.url}`)}&title=${encodeURIComponent(item.title)}&origin=discover`}
     className="w-full group flex flex-row items-stretch gap-6 h-60 py-3"
     target="_blank"
   >

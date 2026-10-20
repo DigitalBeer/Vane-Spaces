@@ -51,7 +51,7 @@ export const chats = sqliteTable('chats', {
     .$type<DBFile[]>()
     .default(sql`'[]'`),
   spaceId: text('spaceId'),
-  origin: text('origin', { enum: ['user', 'digest'] })
+  origin: text('origin', { enum: ['user', 'digest', 'discover'] })
     .notNull()
     .default('user'),
   digestId: text('digestId'),

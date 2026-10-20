@@ -6,10 +6,12 @@ import SessionManager from '@/lib/session';
 import { ChatTurnMessage } from '@/lib/types';
 import { SearchSources } from '@/lib/agents/search/types';
 import db from '@/lib/db';
-import { eq } from 'drizzle-orm';
-import { chats, spaces } from '@/lib/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { chats, messages, spaces } from '@/lib/db/schema';
 import UploadManager from '@/lib/uploads/manager';
 import { resolveSpaceContext } from '@/lib/spaceContext';
+import { loadChatModelWithFallback } from '@/lib/models/loadWithFallback';
+import { errorText } from '@/lib/models/providerError';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,6 +50,10 @@ const bodySchema = z.object({
   systemInstructions: z.string().nullable().optional().default(''),
   spaceId: z.string().nullable().optional().default(null),
   lightweight: z.boolean().optional().default(false),
+  /** Used for a call when the chat model is gone, rate-limited or unreachable. */
+  fallbackChatModel: chatModelSchema.nullable().optional().default(null),
+  /** Recorded on a new chat; 'discover' chats keep using the Discover model. */
+  origin: z.enum(['user', 'discover']).optional().default('user'),
 });
 
 type Body = z.infer<typeof bodySchema>;
@@ -77,6 +83,7 @@ const ensureChatExists = async (input: {
   query: string;
   fileIds: string[];
   spaceId?: string | null;
+  origin?: 'user' | 'discover';
 }) => {
   try {
     const exists = await db.query.chats
@@ -92,6 +99,7 @@ const ensureChatExists = async (input: {
         sources: input.sources,
         title: input.query,
         spaceId: input.spaceId ?? null,
+        origin: input.origin ?? 'user',
         files: input.fileIds.map((id) => {
           return {
             fileId: id,
@@ -133,7 +141,11 @@ export const POST = async (req: Request) => {
     const registry = new ModelRegistry();
 
     const [llm, embedding] = await Promise.all([
-      registry.loadChatModel(body.chatModel.providerId, body.chatModel.key),
+      loadChatModelWithFallback(
+        registry,
+        body.chatModel,
+        body.fallbackChatModel,
+      ),
       registry.loadEmbeddingModel(
         body.embeddingModel.providerId,
         body.embeddingModel.key,
@@ -250,6 +262,26 @@ export const POST = async (req: Request) => {
         systemInstructions: resolvedInstructions,
         lightweight: body.lightweight,
       },
+    }).catch(async (err) => {
+      // Without this a model error (bad key, provider down with no fallback)
+      // was an unhandled rejection and the message stayed "answering" forever.
+      console.error('Search failed:', err);
+      session.emit('error', {
+        data: `The model returned an error: ${errorText(err).slice(0, 300) || 'unknown error'}`,
+      });
+      try {
+        await db
+          .update(messages)
+          .set({ status: 'error' })
+          .where(
+            and(
+              eq(messages.chatId, body.message.chatId),
+              eq(messages.messageId, body.message.messageId),
+            ),
+          );
+      } catch (dbErr) {
+        console.error('Failed to mark message as errored:', dbErr);
+      }
     });
 
     ensureChatExists({
@@ -258,6 +290,7 @@ export const POST = async (req: Request) => {
       fileIds: body.files,
       query: body.message.content,
       spaceId: body.spaceId,
+      origin: body.origin,
     });
 
     req.signal.addEventListener('abort', () => {

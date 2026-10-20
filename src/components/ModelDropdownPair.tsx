@@ -30,11 +30,17 @@ const ModelDropdownPair = ({ kind, providerId, modelKey, onChange }: ModelDropdo
   const modelsFor = (p: Provider | undefined): ProviderModel[] =>
     !p ? [] : kind === 'chat' ? p.chatModels : p.embeddingModels;
 
-  const selectedProvider: Provider | undefined = providers.find((p: Provider) => p.id === providerId);
+  const eligibleProviders: Provider[] = providers.filter(
+    (p: Provider) => modelsFor(p).length > 0,
+  );
+
+  const selectedProvider: Provider | undefined = eligibleProviders.find(
+    (p: Provider) => p.id === providerId,
+  );
   const models: ProviderModel[] = modelsFor(selectedProvider);
 
   const handleProvider = (id: string): void => {
-    const p: Provider | undefined = providers.find((pv: Provider) => pv.id === id);
+    const p: Provider | undefined = eligibleProviders.find((pv: Provider) => pv.id === id);
     const first: string = modelsFor(p)[0]?.key ?? '';
     onChange(id, first);
   };
@@ -46,7 +52,7 @@ const ModelDropdownPair = ({ kind, providerId, modelKey, onChange }: ModelDropdo
     <div className="flex gap-2">
       <select className={selectClass} value={providerId} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleProvider(e.target.value)}>
         <option value="">Provider…</option>
-        {providers.map((p: Provider) => (
+        {eligibleProviders.map((p: Provider) => (
           <option key={p.id} value={p.id}>{p.name}</option>
         ))}
       </select>

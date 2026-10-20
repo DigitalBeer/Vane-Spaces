@@ -1,4 +1,4 @@
-import { Clock, Edit, Share, Trash, FileText, FileDown } from 'lucide-react';
+import { Clock, Edit, Share, Trash, FileText, FileDown, Newspaper } from 'lucide-react';
 import { Message } from './ChatWindow';
 import { useEffect, useState, Fragment } from 'react';
 import { formatTimeDifference } from '@/lib/utils';
@@ -209,7 +209,7 @@ const Navbar = () => {
   const [title, setTitle] = useState<string>('');
   const [timeAgo, setTimeAgo] = useState<string>('');
 
-  const { sections, chatId, spaceId, spaceInfo, setSpaceId, setSpaceInfo } = useChat();
+  const { sections, chatId, spaceId, spaceInfo, setSpaceId, setSpaceInfo, digestInfo } = useChat();
 
   useEffect(() => {
     if (sections.length > 0 && sections[0].message) {
@@ -270,6 +270,15 @@ const Navbar = () => {
               >
                 <SpaceIconMini icon={spaceInfo.icon} />
                 <span className="truncate max-w-[120px]">{spaceInfo.name}</span>
+              </a>
+            )}
+            {digestInfo && (
+              <a
+                href={`/digests?topic=${digestInfo.id}`}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 text-xs text-black/60 dark:text-white/60 hover:text-[#24A0ED] transition-colors duration-150"
+              >
+                <Newspaper size={12} />
+                <span className="truncate max-w-[120px]">{digestInfo.name}</span>
               </a>
             )}
           </div>

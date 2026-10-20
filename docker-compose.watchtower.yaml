@@ -25,5 +25,8 @@ services:
       - WATCHTOWER_LABEL_ENABLE=true # only touch opted-in containers
       - WATCHTOWER_CLEANUP=true # delete old images after updating
       - WATCHTOWER_POLL_INTERVAL=300 # check every 5 minutes
+      # Also replace crash-looping containers; by default Watchtower skips
+      # "restarting" ones, so a broken image could never be fixed by a new one.
+      - WATCHTOWER_INCLUDE_RESTARTING=true
       - TZ=UTC
     restart: unless-stopped

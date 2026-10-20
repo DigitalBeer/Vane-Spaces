@@ -16,5 +16,14 @@ export const register = async () => {
     } catch (error) {
       console.error('Failed to start digest poller:', error);
     }
+
+    try {
+      const { startFreeModelWatcher } = await import(
+        './lib/models/freeModelWatcher'
+      );
+      startFreeModelWatcher();
+    } catch (error) {
+      console.error('Failed to start free-model watcher:', error);
+    }
   }
 };

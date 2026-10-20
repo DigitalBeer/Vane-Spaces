@@ -169,6 +169,7 @@ class Researcher {
         fileIds: input.config.fileIds,
         mode: input.config.mode,
         excludedDomains: input.config.excludedDomains,
+        lightweight: input.config.lightweight,
       });
 
       actionOutput.push(...actionResults);

@@ -14,6 +14,8 @@ export type SearchAgentConfig = {
   mode: 'speed' | 'balanced' | 'quality';
   systemInstructions: string;
   excludedDomains?: string[];
+  /** Cheaper research for slow local models (see researcher/actions/lightweight.ts). */
+  lightweight?: boolean;
 };
 
 export type SearchAgentInput = {
@@ -68,6 +70,7 @@ export type AdditionalConfig = {
   embedding: BaseEmbedding<any>;
   session: SessionManager;
   excludedDomains?: string[];
+  lightweight?: boolean;
 };
 
 export type ResearcherInput = {

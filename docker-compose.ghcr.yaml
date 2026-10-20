@@ -23,7 +23,8 @@ services:
     environment:
       # External SearxNG instance (slim image has no bundled SearxNG).
       - SEARXNG_API_URL=http://192.168.1.250:1996
-      - TZ=UTC
+      # Digest schedules (src/lib/digests/schedule.ts) run on server local time.
+      - TZ=Europe/London
     labels:
       # Opt this container in to the shared Watchtower instance.
       - com.centurylinklabs.watchtower.enable=true

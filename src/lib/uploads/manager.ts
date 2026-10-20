@@ -63,6 +63,28 @@ class UploadManager {
         fs.writeFileSync(UploadManager.uploadedFilesRecordPath, JSON.stringify({ files: currentData }, null, 2));
     }
 
+    /** Deletes a recorded file's on-disk data and its entry in the record. */
+    static removeFile(fileId: string) {
+        if (!fs.existsSync(UploadManager.uploadedFilesRecordPath)) return;
+
+        const files = this.getRecordedFiles();
+        const target = files.find(f => f.id === fileId);
+        if (!target) return;
+
+        const uploadsRoot = path.resolve(UploadManager.uploadsDir) + path.sep;
+        for (const p of new Set([target.filePath, target.contentPath])) {
+            const resolved = path.resolve(p);
+            if (resolved.startsWith(uploadsRoot) && fs.existsSync(resolved)) {
+                fs.unlinkSync(resolved);
+            }
+        }
+
+        fs.writeFileSync(
+            UploadManager.uploadedFilesRecordPath,
+            JSON.stringify({ files: files.filter(f => f.id !== fileId) }, null, 2),
+        );
+    }
+
     static getFile(fileId: string): RecordedFile | null {
         const recordedFiles = this.getRecordedFiles();
 

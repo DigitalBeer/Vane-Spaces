@@ -17,12 +17,11 @@ export type CatalogueEntry = {
   structured?: boolean;
   /** Unix seconds; newer wins ties. */
   created?: number;
+  /** Display name, e.g. "Google: Gemma 4 31B (free)". */
+  name?: string;
 };
 
-export type FreeModelVerdict = {
-  providerId: string;
-  providerName: string;
-  modelKey: string;
+export type FreeModelVerdict = ConfiguredModel & {
   status: 'withdrawn' | 'no-longer-free';
   /** A live free model from the same vendor that supports structured output. */
   replacement?: string;
@@ -32,6 +31,12 @@ export type ConfiguredModel = {
   providerId: string;
   providerName: string;
   modelKey: string;
+  /**
+   * true when the model was added to the connection by hand (switching it
+   * edits the connection); false when it is only selected in a picker from
+   * the live free list (switching just changes the selection).
+   */
+  configured?: boolean;
 };
 
 const listOf = (body: unknown): Record<string, unknown>[] => {
@@ -63,8 +68,22 @@ export function parseOpenRouterCatalogue(body: unknown): CatalogueEntry[] {
         ? params.includes('structured_outputs') || params.includes('response_format')
         : undefined,
       created: typeof m.created === 'number' ? m.created : undefined,
+      name: typeof m.name === 'string' ? m.name.replace(/\s+/g, ' ').trim() : undefined,
     };
   });
+}
+
+/**
+ * The free models Vane can actually use, for listing in the model pickers:
+ * free right now, a `:free` id (which leaves out non-chat models such as
+ * music generators and OpenRouter's own router), and confirmed structured
+ * output support, which Vane's research steps need.
+ */
+export function usableFreeModels(entries: CatalogueEntry[]): { key: string; name: string }[] {
+  return entries
+    .filter((e) => e.free && isFreeModelId(e.id) && e.structured === true)
+    .map((e) => ({ key: e.id, name: e.name ?? e.id }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Whether a provider config points at OpenRouter. */
@@ -140,23 +159,29 @@ type FetchLike = (
 let cache: { at: number; entries: CatalogueEntry[] } | null = null;
 const CACHE_MS = 30 * 60 * 1000;
 
-/** OpenRouter's catalogue, cached for 30 minutes. Empty on any failure. */
+/**
+ * OpenRouter's catalogue, cached for 30 minutes (`force` skips the cache).
+ * If a refresh fails, the last good catalogue is kept, so a brief OpenRouter
+ * outage doesn't empty the model pickers; with nothing cached it's empty.
+ */
 export async function fetchOpenRouterCatalogue(
   fetchImpl: FetchLike = globalThis.fetch as unknown as FetchLike,
   now = Date.now(),
+  force = false,
 ): Promise<CatalogueEntry[]> {
-  if (cache && now - cache.at < CACHE_MS) return cache.entries;
+  if (!force && cache && now - cache.at < CACHE_MS) return cache.entries;
   try {
     const res = await fetchImpl(OPENROUTER_MODELS_URL, {
       signal: AbortSignal.timeout(8_000),
     });
-    if (!res.ok) return [];
+    if (!res.ok) return cache?.entries ?? [];
     const entries = parseOpenRouterCatalogue(await res.json());
-    // An empty list is no evidence of anything; don't cache it.
-    if (entries.length > 0) cache = { at: now, entries };
+    // An empty list is no evidence of anything; keep what we had.
+    if (entries.length === 0) return cache?.entries ?? [];
+    cache = { at: now, entries };
     return entries;
   } catch {
-    return [];
+    return cache?.entries ?? [];
   }
 }
 

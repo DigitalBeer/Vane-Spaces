@@ -6,6 +6,7 @@ import BaseEmbedding from '../../base/embedding';
 import BaseModelProvider from '../../base/provider';
 import BaseLLM from '../../base/llm';
 import OpenAILLM from './openaiLLM';
+import { fetchOpenRouterCatalogue, usableFreeModels } from '../../freeModelCheck';
 
 interface OpenAIConfig {
   apiKey: string;
@@ -153,12 +154,22 @@ class OpenAIProvider extends BaseModelProvider<OpenAIConfig> {
     const defaultModels = await this.getDefaultModels();
     const configProvider = getConfiguredModelProviderById(this.id)!;
 
+    // An OpenRouter connection also lists every live free model Vane can use
+    // (refreshed from OpenRouter's catalogue every 30 minutes), so they can be
+    // picked without typing ids, and retired ones drop off by themselves.
+    const configured = new Set(configProvider.chatModels.map((m) => m.key));
+    const liveFree = /openrouter\.ai/i.test(this.config.baseURL)
+      ? usableFreeModels(await fetchOpenRouterCatalogue()).filter(
+          (m) => !configured.has(m.key),
+        )
+      : [];
+
     return {
       embedding: [
         ...defaultModels.embedding,
         ...configProvider.embeddingModels,
       ],
-      chat: [...defaultModels.chat, ...configProvider.chatModels],
+      chat: [...defaultModels.chat, ...configProvider.chatModels, ...liveFree],
     };
   }
 

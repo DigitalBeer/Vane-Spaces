@@ -7,6 +7,7 @@ import {
   parseOpenRouterCatalogue,
   rankReplacements,
   resetCatalogueCache,
+  usableFreeModels,
 } from './freeModelCheck';
 
 const free = { prompt: '0', completion: '0' };
@@ -84,8 +85,37 @@ describe('isOpenRouterProvider', () => {
   });
 });
 
+describe('usableFreeModels', () => {
+  it('lists free :free models with structured output, by display name', () => {
+    const list = usableFreeModels(
+      parseOpenRouterCatalogue({
+        data: [
+          ...catalogue.data,
+          { id: 'google/lyria-3-pro-preview', name: 'Google: Lyria 3', pricing: free, supported_parameters: structured },
+          { id: 'openrouter/free', name: 'Free Models Router', pricing: free, supported_parameters: structured },
+          { id: 'google/gemma-4-31b-it:free', name: 'Google:  Gemma 4 31B (free)', pricing: free, supported_parameters: structured },
+        ],
+      }),
+    );
+    expect(list).toEqual([
+      { key: 'google/gemma-4-31b-it:free', name: 'Google: Gemma 4 31B (free)' },
+      { key: 'google/gemma-4-12b:free', name: 'google/gemma-4-12b:free' },
+      { key: 'meta-llama/llama-3.3-70b-instruct:free', name: 'meta-llama/llama-3.3-70b-instruct:free' },
+      { key: 'meta-llama/llama-4-scout:free', name: 'meta-llama/llama-4-scout:free' },
+    ]);
+  });
+});
+
 describe('fetchOpenRouterCatalogue', () => {
   beforeEach(() => resetCatalogueCache());
+
+  it('keeps the last good catalogue when a refresh fails', async () => {
+    const ok = async () => ({ ok: true, json: async () => catalogue });
+    const down = async () => ({ ok: false, json: async () => ({}) });
+    await fetchOpenRouterCatalogue(ok, 1_000);
+    expect((await fetchOpenRouterCatalogue(down, 10_000_000, true)).length).toBe(5);
+    expect((await fetchOpenRouterCatalogue(async () => { throw new Error('offline'); }, 20_000_000, true)).length).toBe(5);
+  });
 
   it('returns an empty list when the fetch fails, and caches a good result', async () => {
     expect(await fetchOpenRouterCatalogue(async () => { throw new Error('offline'); })).toEqual([]);

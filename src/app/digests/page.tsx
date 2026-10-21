@@ -127,6 +127,8 @@ const DigestsPage = () => {
       chatModelKey: row.chatModelKey,
       embeddingModelProviderId: row.embeddingModelProviderId,
       embeddingModelKey: row.embeddingModelKey,
+      fallbackChatModelProviderId: row.fallbackChatModelProviderId ?? null,
+      fallbackChatModelKey: row.fallbackChatModelKey ?? null,
     });
   };
 

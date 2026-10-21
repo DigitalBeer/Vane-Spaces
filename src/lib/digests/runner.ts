@@ -2,6 +2,7 @@ import db from '@/lib/db';
 import { chats, messages, spaces, digestTopics } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
 import ModelRegistry from '@/lib/models/registry';
+import { loadChatModelWithFallback } from '@/lib/models/loadWithFallback';
 import SessionManager from '@/lib/session';
 import SearchAgent from '@/lib/agents/search';
 import { computeNextRunAt } from './schedule';
@@ -29,7 +30,13 @@ export async function runDigest(topic: DigestTopicRow): Promise<void> {
   let llm; let embedding;
   try {
     const loaded = await Promise.all([
-      registry.loadChatModel(topic.chatModelProviderId, topic.chatModelKey),
+      loadChatModelWithFallback(
+        registry,
+        { providerId: topic.chatModelProviderId, key: topic.chatModelKey },
+        topic.fallbackChatModelProviderId && topic.fallbackChatModelKey
+          ? { providerId: topic.fallbackChatModelProviderId, key: topic.fallbackChatModelKey }
+          : null,
+      ),
       registry.loadEmbeddingModel(topic.embeddingModelProviderId, topic.embeddingModelKey),
     ]);
     llm = loaded[0];

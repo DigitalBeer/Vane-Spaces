@@ -113,6 +113,9 @@ export const digestTopics = sqliteTable('digest_topics', {
   chatModelKey: text('chatModelKey').notNull(),
   embeddingModelProviderId: text('embeddingModelProviderId').notNull(),
   embeddingModelKey: text('embeddingModelKey').notNull(),
+  // Optional: used when the chat model fails (rate-limited, offline, withdrawn).
+  fallbackChatModelProviderId: text('fallbackChatModelProviderId'),
+  fallbackChatModelKey: text('fallbackChatModelKey'),
   lastRunAt: text('lastRunAt'),
   nextRunAt: text('nextRunAt').notNull(),
   lastRunError: text('lastRunError'),

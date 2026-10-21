@@ -35,11 +35,20 @@ const schema = z.object({
 });
 
 export const classify = async (input: ClassifierInput) => {
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
   const output = await input.llm.generateObject<typeof schema>({
     messages: [
       {
         role: 'system',
-        content: classifierPrompt,
+        // Without the date, models fill "today"/"latest" with their training
+        // year (e.g. "AI model releases today 2024") and search for old news.
+        content: `${classifierPrompt}\nToday's date is ${today}. In the standalone follow-up, keep relative times like "today" or "this week" as they are or resolve them against this date; never add a different year.`,
       },
       {
         role: 'user',

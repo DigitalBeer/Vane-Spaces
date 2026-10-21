@@ -2,6 +2,7 @@ import db from '@/lib/db';
 import { digestTopics } from '@/lib/db/schema';
 import ModelRegistry from '@/lib/models/registry';
 import { computeNextRunAt } from '@/lib/digests/schedule';
+import { checkDigestModels, readFallbackChoice } from '@/lib/digests/models';
 import crypto from 'crypto';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
@@ -54,15 +55,15 @@ export const POST = async (req: Request): Promise<Response> => {
     if (!chatModelProviderId || !chatModelKey || !embeddingModelProviderId || !embeddingModelKey)
       return Response.json({ message: 'Chat and embedding model provider/key are required.' }, { status: 400 });
 
+    const fallback = readFallbackChoice(body);
+
     // validate the chosen models exist
     const registry = new ModelRegistry();
     const providers = await registry.getActiveProviders();
-    const chatProvider = providers.find((p: { id: string }) => p.id === chatModelProviderId);
-    const embedProvider = providers.find((p: { id: string }) => p.id === embeddingModelProviderId);
-    const chatOk = !!chatProvider && chatProvider.chatModels.some((m: { key: string }) => m.key === chatModelKey);
-    const embedOk = !!embedProvider && embedProvider.embeddingModels.some((m: { key: string }) => m.key === embeddingModelKey);
-    if (!chatOk) return Response.json({ message: 'Selected chat model is not configured.' }, { status: 400 });
-    if (!embedOk) return Response.json({ message: 'Selected embedding model is not configured.' }, { status: 400 });
+    const modelError = checkDigestModels(providers, {
+      chatModelProviderId, chatModelKey, embeddingModelProviderId, embeddingModelKey, ...fallback,
+    });
+    if (modelError) return Response.json({ message: modelError }, { status: 400 });
 
     const now: string = new Date().toISOString();
     const nextRunAt: string = computeNextRunAt({ frequency: frequency as 'daily' | 'weekly', timeOfDay, dayOfWeek }, new Date());
@@ -84,6 +85,7 @@ export const POST = async (req: Request): Promise<Response> => {
       chatModelKey,
       embeddingModelProviderId,
       embeddingModelKey,
+      ...fallback,
       nextRunAt,
       createdAt: now,
       updatedAt: now,

@@ -2,6 +2,8 @@ import db from '@/lib/db';
 import { digestTopics } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { computeNextRunAt } from '@/lib/digests/schedule';
+import { checkDigestModels, readFallbackChoice } from '@/lib/digests/models';
+import ModelRegistry from '@/lib/models/registry';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
@@ -39,6 +41,31 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (body.frequency === 'daily' || body.frequency === 'weekly') updates.frequency = body.frequency;
     if (typeof body.timeOfDay === 'string' && /^\d{2}:\d{2}$/.test(body.timeOfDay)) updates.timeOfDay = body.timeOfDay;
     if (typeof body.dayOfWeek === 'number' || body.dayOfWeek === null) updates.dayOfWeek = body.dayOfWeek;
+
+    // Model changes: any model field in the body re-validates the full choice.
+    const modelFields = [
+      'chatModelProviderId', 'chatModelKey', 'embeddingModelProviderId', 'embeddingModelKey',
+      'fallbackChatModelProviderId', 'fallbackChatModelKey',
+    ];
+    if (modelFields.some((f) => f in body)) {
+      const str = (v: unknown, current: string): string => (typeof v === 'string' && v ? v : current);
+      const choice = {
+        chatModelProviderId: str(body.chatModelProviderId, existing.chatModelProviderId),
+        chatModelKey: str(body.chatModelKey, existing.chatModelKey),
+        embeddingModelProviderId: str(body.embeddingModelProviderId, existing.embeddingModelProviderId),
+        embeddingModelKey: str(body.embeddingModelKey, existing.embeddingModelKey),
+        ...('fallbackChatModelProviderId' in body || 'fallbackChatModelKey' in body
+          ? readFallbackChoice(body)
+          : {
+              fallbackChatModelProviderId: existing.fallbackChatModelProviderId,
+              fallbackChatModelKey: existing.fallbackChatModelKey,
+            }),
+      };
+      const providers = await new ModelRegistry().getActiveProviders();
+      const modelError = checkDigestModels(providers, choice);
+      if (modelError) return Response.json({ message: modelError }, { status: 400 });
+      Object.assign(updates, choice);
+    }
 
     const scheduleChanged: boolean =
       'frequency' in updates || 'timeOfDay' in updates || 'dayOfWeek' in updates;

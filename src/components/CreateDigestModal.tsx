@@ -18,6 +18,8 @@ export type EditableDigest = {
   chatModelKey: string;
   embeddingModelProviderId: string;
   embeddingModelKey: string;
+  fallbackChatModelProviderId: string | null;
+  fallbackChatModelKey: string | null;
 };
 
 type CreateDigestModalProps = {
@@ -49,6 +51,8 @@ const CreateDigestModal: React.FC<CreateDigestModalProps> = ({ onClose, onSaved,
   const [chatModelKey, setChatModelKey] = useState(editing?.chatModelKey ?? '');
   const [embedProviderId, setEmbedProviderId] = useState(editing?.embeddingModelProviderId ?? '');
   const [embedModelKey, setEmbedModelKey] = useState(editing?.embeddingModelKey ?? '');
+  const [fallbackProviderId, setFallbackProviderId] = useState(editing?.fallbackChatModelProviderId ?? '');
+  const [fallbackModelKey, setFallbackModelKey] = useState(editing?.fallbackChatModelKey ?? '');
   const [instructions, setInstructions] = useState(editing?.instructions ?? '');
   const [excluded, setExcluded] = useState(editing?.excludedDomains.join('\n') ?? '');
   const [loading, setLoading] = useState(false);
@@ -77,6 +81,8 @@ const CreateDigestModal: React.FC<CreateDigestModalProps> = ({ onClose, onSaved,
         chatModelKey,
         embeddingModelProviderId: embedProviderId,
         embeddingModelKey: embedModelKey,
+        fallbackChatModelProviderId: fallbackProviderId && fallbackModelKey ? fallbackProviderId : null,
+        fallbackChatModelKey: fallbackProviderId && fallbackModelKey ? fallbackModelKey : null,
         instructions: instructions.trim() || null,
         excludedDomains,
       };
@@ -220,6 +226,19 @@ const CreateDigestModal: React.FC<CreateDigestModalProps> = ({ onClose, onSaved,
                 setChatModelKey(m);
               }}
             />
+          </div>
+          <div>
+            <label className="block text-sm text-black/60 dark:text-white/60 mb-1">Fallback chat model (optional)</label>
+            <ModelDropdownPair
+              kind="chat"
+              providerId={fallbackProviderId}
+              modelKey={fallbackModelKey}
+              onChange={(p: string, m: string) => {
+                setFallbackProviderId(p);
+                setFallbackModelKey(m);
+              }}
+            />
+            <p className="text-xs text-black/40 dark:text-white/40 mt-1">Used if the chat model fails, e.g. a free cloud model that is rate-limited. A local model is a good choice here.</p>
           </div>
           <div>
             <label className="block text-sm text-black/60 dark:text-white/60 mb-1">Embedding model</label>

@@ -10,9 +10,11 @@ import { deleteMessagesFts, indexMessageFts } from '@/lib/db/messagesFts';
 import { and, eq, gt } from 'drizzle-orm';
 import { TextBlock } from '@/lib/types';
 import { getTokenCount } from '@/lib/utils/splitText';
+import { AnswerModelInfo } from '@/lib/models/answerInfo';
 
 class SearchAgent {
   async searchAsync(session: SessionManager, input: SearchAgentInput) {
+    const startedAt = new Date().toISOString();
     const exists = await db.query.messages.findFirst({
       where: and(
         eq(messages.chatId, input.chatId),
@@ -177,7 +179,15 @@ class SearchAgent {
       }
     }
 
-    session.emit('end', {});
+    // The writer stream is the last model call, so this names the model that
+    // wrote the answer (the fallback, if the chosen model failed).
+    const modelInfo: AnswerModelInfo = {
+      ...input.config.llm.answeredBy(),
+      startedAt,
+      completedAt: new Date().toISOString(),
+    };
+
+    session.emit('end', { modelInfo });
 
     const finalBlocks = session.getAllBlocks();
 
@@ -186,6 +196,7 @@ class SearchAgent {
       .set({
         status: 'completed',
         responseBlocks: finalBlocks,
+        modelInfo,
       })
       .where(
         and(

@@ -108,6 +108,17 @@ describe('FallbackLLM', () => {
     expect(fallback.calls).toBe(0);
   });
 
+  it('reports which model served the latest call', async () => {
+    const primary = Object.assign(fakeLLM('cloud', { failWith: new Error('429 Rate limit exceeded') }), {
+      label: { provider: 'OpenRouter', model: 'free-model' },
+    });
+    const fallback = Object.assign(fakeLLM('laptop'), { label: { provider: 'Laptop', model: 'gemma' } });
+    const llm = wrap(primary, fallback);
+    expect(llm.answeredBy()).toEqual({ model: primary.label });
+    await collect(llm.streamText(input));
+    expect(llm.answeredBy()).toEqual({ model: fallback.label, fallbackFrom: primary.label });
+  });
+
   it('surfaces the fallback error if the fallback also fails', async () => {
     const primary = fakeLLM('cloud', { failWith: new Error('fetch failed') });
     const fallback = fakeLLM('laptop', { failWith: new Error('connect ECONNREFUSED') });

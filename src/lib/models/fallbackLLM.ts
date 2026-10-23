@@ -41,8 +41,23 @@ type FallbackOptions = {
  * only switches if the primary failed before producing any output.
  */
 class FallbackLLM extends BaseLLM<null> {
+  private lastServed: BaseLLM<any> | null = null;
+
   constructor(private readonly opts: FallbackOptions) {
     super(null);
+    this.label = opts.primary.label;
+  }
+
+  answeredBy() {
+    return this.lastServed === this.opts.fallback
+      ? { model: this.opts.fallback.label, fallbackFrom: this.opts.primary.label }
+      : { model: this.opts.primary.label };
+  }
+
+  /** Records which model is serving the current call. */
+  private serve(llm: BaseLLM<any>): BaseLLM<any> {
+    this.lastServed = llm;
+    return llm;
   }
 
   private useFallbackNow(): boolean {
@@ -72,12 +87,12 @@ class FallbackLLM extends BaseLLM<null> {
   }
 
   private async run<T>(call: (llm: BaseLLM<any>) => Promise<T>): Promise<T> {
-    if (this.useFallbackNow()) return call(this.opts.fallback);
+    if (this.useFallbackNow()) return call(this.serve(this.opts.fallback));
     try {
-      return await call(this.opts.primary);
+      return await call(this.serve(this.opts.primary));
     } catch (error) {
       if (!this.handleFailure(error)) throw error;
-      return call(this.opts.fallback);
+      return call(this.serve(this.opts.fallback));
     }
   }
 
@@ -85,18 +100,18 @@ class FallbackLLM extends BaseLLM<null> {
     make: (llm: BaseLLM<any>) => AsyncGenerator<T>,
   ): AsyncGenerator<T> {
     if (this.useFallbackNow()) {
-      yield* make(this.opts.fallback);
+      yield* make(this.serve(this.opts.fallback));
       return;
     }
     let started = false;
     try {
-      for await (const chunk of make(this.opts.primary)) {
+      for await (const chunk of make(this.serve(this.opts.primary))) {
         started = true;
         yield chunk;
       }
     } catch (error) {
       if (started || !this.handleFailure(error)) throw error;
-      yield* make(this.opts.fallback);
+      yield* make(this.serve(this.opts.fallback));
     }
   }
 

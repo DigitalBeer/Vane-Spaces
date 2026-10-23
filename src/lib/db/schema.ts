@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { text, integer, sqliteTable, index } from 'drizzle-orm/sqlite-core';
 import { Block } from '../types';
 import { SearchSources } from '../agents/search/types';
+import type { AnswerModelInfo } from '../models/answerInfo';
 
 export const messages = sqliteTable('messages', {
   id: integer('id').primaryKey(),
@@ -16,6 +17,7 @@ export const messages = sqliteTable('messages', {
   status: text({ enum: ['answering', 'completed', 'error'] }).default(
     'answering',
   ),
+  modelInfo: text('modelInfo', { mode: 'json' }).$type<AnswerModelInfo>(),
 });
 
 export interface DBFile {

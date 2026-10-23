@@ -30,6 +30,7 @@ import { ResearchBlock } from '@/lib/types';
 import Renderer from './Widgets/Renderer';
 import CodeBlock from './MessageRenderer/CodeBlock';
 import { computeTokensPerSecond } from '@/lib/metrics';
+import { formatAnswerNote } from '@/lib/answerModelNote';
 
 const ThinkTagProcessor = ({
   children,
@@ -317,6 +318,14 @@ const MessageBox = ({
                       </button>
                     </div>
                   </div>
+                )}
+                {section.message.modelInfo && !(loading && isLast) && (
+                  <p
+                    className="-mt-2 mb-2 text-xs text-black/50 dark:text-white/50 break-words"
+                    title={section.message.modelInfo.model?.model}
+                  >
+                    {formatAnswerNote(section.message.modelInfo)}
+                  </p>
                 )}
 
                 {isLast &&

@@ -620,6 +620,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         },
       );
     } else if (!chatId) {
+      chatOriginRef.current =
+        searchParams.get('origin') === 'discover' ? 'discover' : 'user';
       setNewChatCreated(true);
       setIsMessagesLoaded(true);
       setChatId(crypto.randomBytes(20).toString('hex'));
@@ -665,6 +667,10 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         toast.error('Cannot send message before the configuration is ready');
         return;
       }
+      // The provider lives in the root layout and outlives page changes, so the
+      // origin set at mount is stale by the time a Discover article is opened.
+      chatOriginRef.current =
+        searchParams.get('origin') === 'discover' ? 'discover' : 'user';
       sendMessage(
         initialMessage,
         undefined,
@@ -775,7 +781,12 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         setMessages((prev) =>
           prev.map((msg) =>
             msg.messageId === messageId
-              ? { ...msg, completedAt, status: 'completed' as const }
+              ? {
+                  ...msg,
+                  completedAt,
+                  status: 'completed' as const,
+                  modelInfo: data.modelInfo ?? msg.modelInfo,
+                }
               : msg,
           ),
         );

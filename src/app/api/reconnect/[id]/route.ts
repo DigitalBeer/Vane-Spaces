@@ -52,6 +52,7 @@ export const POST = async (
           encoder.encode(
             JSON.stringify({
               type: 'messageEnd',
+              modelInfo: data?.modelInfo,
             }) + '\n',
           ),
         );

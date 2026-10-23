@@ -8,6 +8,7 @@ import { useChat } from '@/lib/hooks/useChat';
 import SettingsButtonMobile from './Settings/SettingsButtonMobile';
 import { Block } from '@/lib/types';
 import Loader from './ui/Loader';
+import { AnswerModelInfo } from '@/lib/models/answerInfo';
 
 export interface BaseMessage {
   chatId: string;
@@ -23,6 +24,8 @@ export interface Message extends BaseMessage {
   status: 'answering' | 'completed' | 'error';
   responseStartedAt?: number;
   completedAt?: number;
+  /** Which model answered and when; set once the answer is finished. */
+  modelInfo?: AnswerModelInfo | null;
 }
 
 export interface File {

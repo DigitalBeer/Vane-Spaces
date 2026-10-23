@@ -208,6 +208,7 @@ export const POST = async (req: Request) => {
           encoder.encode(
             JSON.stringify({
               type: 'messageEnd',
+              modelInfo: data?.modelInfo,
             }) + '\n',
           ),
         );

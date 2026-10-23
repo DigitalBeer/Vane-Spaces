@@ -77,6 +77,7 @@ class ModelRegistry {
     if (!provider) throw new Error('Invalid provider id');
 
     const model = await provider.provider.loadChatModel(modelName);
+    model.label = { provider: provider.name, model: modelName };
 
     return model;
   }

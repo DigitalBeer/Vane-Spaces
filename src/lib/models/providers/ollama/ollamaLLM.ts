@@ -30,6 +30,14 @@ const reasoningModels = [
   'glm-4.7-flash',
 ];
 
+// Models where `think: false` breaks structured output: LFM3 on Ollama 0.40.13
+// never returns a JSON-format reply with thinking off. It thinks regardless, so
+// leave thinking on for these.
+const keepThinkingOn = ['lfm3'];
+
+// Whether each model reports the 'thinking' capability, per Ollama host.
+const thinkingCapable = new Map<string, Promise<boolean>>();
+
 class OllamaLLM extends BaseLLM<OllamaConfig> {
   ollamaClient: Ollama;
 
@@ -39,6 +47,32 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
     this.ollamaClient = new Ollama({
       host: this.config.baseURL || 'http://localhost:11434',
     });
+  }
+
+  /**
+   * Turns thinking off for any model that can think. Vane doesn't show or use
+   * hidden reasoning, and on CPU it costs minutes per answer (MiniCPM5-2B: 112 s
+   * vs 3.4 s for one classifier step). The name list covers servers too old to
+   * report capabilities.
+   */
+  async thinkOption(): Promise<{ think?: false }> {
+    const model = this.config.model;
+    if (keepThinkingOn.some((m) => model.includes(m))) return {};
+    if (reasoningModels.some((m) => model.includes(m))) return { think: false };
+
+    const cacheKey = `${this.config.baseURL}|${model}`;
+    let capable = thinkingCapable.get(cacheKey);
+    if (!capable) {
+      capable = this.ollamaClient
+        .show({ model })
+        .then((info) => (info.capabilities ?? []).includes('thinking'))
+        .catch(() => {
+          thinkingCapable.delete(cacheKey);
+          return false;
+        });
+      thinkingCapable.set(cacheKey, capable);
+    }
+    return (await capable) ? { think: false } : {};
   }
 
   convertToOllamaMessages(messages: Message[]): OllamaMessage[] {
@@ -86,9 +120,7 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
       model: this.config.model,
       messages: this.convertToOllamaMessages(input.messages),
       tools: ollamaTools.length > 0 ? ollamaTools : undefined,
-      ...(reasoningModels.find((m) => this.config.model.includes(m))
-        ? { think: false }
-        : {}),
+      ...(await this.thinkOption()),
       options: {
         top_p: input.options?.topP ?? this.config.options?.topP,
         temperature:
@@ -140,9 +172,7 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
       model: this.config.model,
       messages: this.convertToOllamaMessages(input.messages),
       stream: true,
-      ...(reasoningModels.find((m) => this.config.model.includes(m))
-        ? { think: false }
-        : {}),
+      ...(await this.thinkOption()),
       tools: ollamaTools.length > 0 ? ollamaTools : undefined,
       options: {
         top_p: input.options?.topP ?? this.config.options?.topP,
@@ -188,9 +218,7 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
       model: this.config.model,
       messages: this.convertToOllamaMessages(input.messages),
       format: z.toJSONSchema(input.schema),
-      ...(reasoningModels.find((m) => this.config.model.includes(m))
-        ? { think: false }
-        : {}),
+      ...(await this.thinkOption()),
       options: {
         top_p: input.options?.topP ?? this.config.options?.topP,
         temperature:
@@ -228,9 +256,7 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
       messages: this.convertToOllamaMessages(input.messages),
       format: z.toJSONSchema(input.schema),
       stream: true,
-      ...(reasoningModels.find((m) => this.config.model.includes(m))
-        ? { think: false }
-        : {}),
+      ...(await this.thinkOption()),
       options: {
         top_p: input.options?.topP ?? this.config.options?.topP,
         temperature:
